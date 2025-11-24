@@ -1,5 +1,9 @@
 # PSsurvival
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/cxinyang/PSsurvival/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/cxinyang/PSsurvival/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+
 Propensity score weighting methods for causal survival analysis with binary and multiple treatments.
 
 ## Overview
@@ -21,7 +25,7 @@ Both functions support:
 
 ```r
 # Install from GitHub (requires devtools)
-devtools::install_github("your-username/PSsurvival")
+devtools::install_github("cxinyang/PSsurvival")
 ```
 
 ## Usage

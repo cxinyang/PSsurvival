@@ -1,0 +1,44 @@
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+.RDataTmp
+
+# User-specific files
+.Ruserdata
+
+# RStudio files
+.Rproj.user/
+*.Rproj
+
+# OAuth2 token
+.httr-oauth
+
+# knitr and R markdown default cache directories
+*_cache/
+/cache/
+
+# Temporary files created by R markdown
+*.utf8.md
+*.knit.md
+
+# R Environment Variables
+.Renviron
+
+# macOS system files
+.DS_Store
+
+# Preview/temporary HTML files
+*-preview.html
+
+# pkgdown site
+docs/
+_pkgdown.yml
+
+# Translation temp files
+po/*~
+
+# RStudio Connect folder
+rsconnect/

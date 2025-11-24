@@ -1,0 +1,438 @@
+---
+title: "PSsurvival: Propensity Score Weighting for Survival Analysis"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+vignette: >
+  %\VignetteIndexEntry{PSsurvival: Propensity Score Weighting for Survival Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6,
+  fig.height = 4
+)
+```
+
+## Introduction
+
+PSsurvival implements propensity score weighting methods for causal inference with time-to-event outcomes. The package provides two main functions:
+
+- **`surveff()`**: Estimates counterfactual survival functions and survival differences
+- **`marCoxph()`**: Estimates marginal hazard ratios via weighted Cox regression
+
+Both functions support binary and multiple treatment groups, multiple weighting schemes, and propensity score trimming.
+
+```{r load-package}
+library(PSsurvival)
+```
+
+## Data
+
+The package includes two simulated datasets:
+
+```{r data}
+data(simdata_bin)   # Binary treatment (A vs B)
+data(simdata_multi) # Four treatment groups (A, B, C, D)
+
+# Binary treatment data
+head(simdata_bin)
+table(simdata_bin$Z)
+
+# Multiple treatment data
+table(simdata_multi$Z)
+```
+
+Both datasets contain:
+
+- `X1`, `X2`, `X3`: Continuous covariates
+- `B1`, `B2`: Binary covariates
+- `Z`: Treatment group
+- `time`: Follow-up time (range 0-20)
+- `event`: Event indicator (1 = event, 0 = censored)
+
+## Counterfactual Survival Analysis with `surveff()`
+
+### Key Arguments
+
+**Data and model specification:**
+
+- `data`: Data frame containing treatment, outcome, and covariates
+- `ps_formula`: Propensity score model (`treatment ~ covariates`)
+- `censoring_formula`: Censoring model (`Surv(time, event) ~ covariates`)
+- `eval_times`: Time points for evaluation (default: all unique event times)
+- `contrast_matrix`: Matrix for pairwise comparisons (multiple groups only; column names must match treatment levels)
+
+**Weighting and trimming:**
+
+- `estimand`: Target estimand ("ATE", "ATT", or "overlap")
+- `att_group`: Target group for ATT (required if `estimand = "ATT"`)
+- `trim`: Trimming method ("symmetric" or "asymmetric", default: no trimming)
+- `delta`: Threshold for symmetric trimming
+- `alpha`: Percentile for asymmetric trimming
+
+**Variance estimation:**
+
+- `censoring_method`: Method for censoring adjustment ("weibull" or "cox")
+- `variance_method`: Variance estimation ("analytical" or "bootstrap")
+- `boot_level`: Bootstrap sampling level ("full" or "strata")
+- `B`: Number of bootstrap iterations
+- `parallel`, `mc.cores`, `seed`: Parallel computing and reproducibility
+
+### Basic Usage: Binary Treatment
+
+```{r surveff-basic}
+result_bin <- surveff(
+  data = simdata_bin,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  censoring_formula = survival::Surv(time, event) ~ X1 + B1,
+  estimand = "overlap",
+  censoring_method = "weibull"
+)
+
+print(result_bin, max.len = 3)
+```
+
+The `ps_formula` specifies the propensity score model (treatment ~ covariates). The `censoring_formula` models the censoring distribution within each treatment group.
+
+### Multiple Treatment Groups
+
+For multiple groups, survival differences require a `contrast_matrix` specifying which comparisons to make. Each row represents one contrast with exactly two non-zero elements: 1 and -1. **Column names must match treatment levels exactly.**
+
+```{r surveff-multi}
+# Define pairwise comparisons
+contrast_mat <- matrix(
+  c(1, -1, 0, 0,   # A vs B
+    1, 0, -1, 0,   # A vs C
+    1, 0, 0, -1),  # A vs D
+  nrow = 3, byrow = TRUE
+)
+colnames(contrast_mat) <- c("A", "B", "C", "D")  # Must match treatment levels
+rownames(contrast_mat) <- c("A vs B", "A vs C", "A vs D") # row names are optional
+
+result_multi <- surveff(
+  data = simdata_multi,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  censoring_formula = survival::Surv(time, event) ~ X1 + B1,
+  estimand = "ATE",
+  contrast_matrix = contrast_mat,
+  censoring_method = "cox",
+  variance_method = "bootstrap",
+  B = 50,
+  seed = 123
+)
+
+print(result_multi, max.len = 3)
+```
+
+Without `contrast_matrix`, only group-specific survival functions are estimated (no differences in survivals).
+
+### Estimand Options
+
+Three estimands are supported and estimated by corresponding weighting methods:
+
+- **ATE** (default): Average treatment effect for the entire population using inverse probability weighting (IPW)
+- **ATT**: Average treatment effect on the treated (requires `att_group`) using IPW with target-group specific tilting
+- **overlap**: Targets the overlap population where treatment groups have most similar covariate distributions using overlap weights
+
+```{r estimands, eval=FALSE}
+# ATE (default)
+surveff(..., estimand = "ATE")
+
+# ATT targeting group B
+surveff(..., estimand = "ATT", att_group = "B")
+
+# Overlap weights
+surveff(..., estimand = "overlap")
+```
+
+### Propensity Score Trimming
+
+Trimming excludes observations with extreme propensity scores. Not available with overlap weights (which already downweight extremes).
+
+- **Symmetric** (Crump): Removes observations with PS below `delta` or above `1-delta` for any treatment
+- **Asymmetric** (Sturmer): Removes based on treatment-specific quantiles
+
+```{r trimming, eval=FALSE}
+# Symmetric trimming
+surveff(..., estimand = "ATE", trim = "symmetric", delta = 0.1)
+
+# Asymmetric trimming
+surveff(..., estimand = "ATE", trim = "asymmetric", alpha = 0.05)
+```
+
+### Censoring Methods
+
+Two methods are available for estimating censoring distributions:
+
+- **`"weibull"`** (default): Parametric Weibull AFT model. Efficient when censoring follows Weibull distribution. Allows analytical variance for binary treatment.
+- **`"cox"`**: Semi-parametric Cox proportional hazards model. More flexible but requires bootstrap variance.
+
+```{r censoring-methods, eval=FALSE}
+# Weibull censoring model
+surveff(..., censoring_method = "weibull")
+
+# Cox censoring model (requires bootstrap)
+surveff(..., censoring_method = "cox", variance_method = "bootstrap", B = 200)
+```
+
+**No censoring adjustment**: To skip censoring adjustment entirely (e.g., when there is no censoring), use `censoring_formula = Surv(time, event) ~ 0`. In this case, all censoring scores are set to 1.
+
+### Variance Estimation
+
+Two variance estimation methods are available:
+
+- **`"analytical"`**: M-estimation theory-based variance. Only available for binary treatment with Weibull censoring. Fast and efficient when applicable.
+- **`"bootstrap"`**: Resamples the entire estimation pipeline. Required for Cox censoring or multiple treatment groups. More computationally intensive but broadly applicable.
+
+```{r variance-methods, eval=FALSE}
+# Analytical variance (binary + weibull only)
+surveff(..., censoring_method = "weibull", variance_method = "analytical")
+
+# Bootstrap variance
+surveff(..., variance_method = "bootstrap", B = 200)
+```
+
+**Bootstrap sampling level** (`boot_level`): Controls how bootstrap samples are drawn.
+
+- **`"full"`** (default): Resamples from entire dataset. Standard choice for observational studies.
+- **`"strata"`**: Resamples within treatment groups, preserving group sizes. Useful when treatment assignment follows a stratified or fixed-ratio design.
+
+```{r boot-level, eval=FALSE}
+# Stratified bootstrap
+surveff(..., variance_method = "bootstrap", boot_level = "strata", B = 200)
+```
+
+### Summary Output
+
+The `summary()` method provides two output styles:
+
+**Printed output** (`style = "prints"`, default): Displays formatted tables with confidence intervals. Customize with:
+
+- `conf_level`: Confidence level (default 0.95)
+- `max.len`: Maximum rows to display
+- `round.digits`: Number of decimal places
+
+**Programmatic output** (`style = "returns"`): Returns a list of matrices for further processing:
+
+- `survival_summary`: List of survival estimates by group
+- `difference_summary`: List of treatment effect estimates
+
+```{r summary-surveff}
+summary(result_bin, conf_level = 0.95, max.len = 5)
+```
+
+For programmatic access:
+
+```{r summary-returns}
+summ <- summary(result_bin, style = "returns")
+names(summ)
+head(summ$survival_summary$A)
+head(summ$difference_summary$`B vs A`)
+```
+
+### Plotting Results
+
+The `plot()` method produces survival curves (`type = "surv"`) or treatment effect curves (`type = "survdiff"`).
+
+```{r plot-surv, fig.width=7, fig.height=5}
+# Survival curves for all groups
+plot(result_multi, type = "surv", curve_width = 0.5)
+```
+
+```{r plot-survdiff, fig.width=7, fig.height=5}
+# Treatment effect curves
+plot(result_multi, type = "survdiff", curve_width = 0.5)
+```
+
+**Selecting specific strata**: Use `strata_to_plot` to display a subset of groups or contrasts.
+
+```{r plot-subset-surv, fig.width=7, fig.height=5}
+# Only groups A and C
+plot(result_multi, type = "surv", curve_width = 0.5,
+     strata_to_plot = c("A", "C"))
+```
+
+```{r plot-subset-diff, fig.width=7, fig.height=5}
+# Only specific contrasts (names must match contrast_matrix rownames exactly)
+plot(result_multi, type = "survdiff", curve_width = 0.5,
+     strata_to_plot = c("A vs B", "A vs D"))
+```
+
+**Customization options**:
+
+- `strata_to_plot`: Vector of strata names to display
+- `strata_colors`: Custom colors for each stratum (length must match `strata_to_plot`)
+- `max_time`: Maximum time on x-axis
+- `include_CI`: Show confidence interval ribbons (TRUE/FALSE)
+- `conf_level`: Confidence level for intervals
+- `curve_width`: Line width for curves
+- `CI_alpha`: Transparency of CI ribbons (0-1)
+- `legend_position`: "right" or "bottom"
+- `legend_title`, `plot_title`: Custom titles
+
+```{r plot-custom, fig.width=7, fig.height=5}
+plot(result_multi,
+     type = "surv",
+     curve_width = 0.5,
+     strata_to_plot = c("A", "B"),
+     strata_colors = c("steelblue", "coral"),
+     max_time = 15,
+     include_CI = TRUE,
+     legend_position = "bottom",
+     plot_title = "Survival by Treatment Group")
+```
+
+## Marginal Hazard Ratios with `marCoxph()`
+
+`marCoxph()` fits a weighted Cox model to estimate marginal hazard ratios.
+
+### Key Arguments
+
+**Data and model specification:**
+
+- `data`: Data frame containing treatment, outcome, and covariates
+- `ps_formula`: Propensity score model (`treatment ~ covariates`)
+- `time_var`: Name of time-to-event variable (character string)
+- `event_var`: Name of event indicator variable (character string, 1=event, 0=censored)
+- `reference_level`: Reference treatment level (MANDATORY)
+
+**Weighting and trimming:**
+
+- `estimand`: Target estimand ("ATE", "ATT", or "overlap")
+- `att_group`: Target group for ATT (required if `estimand = "ATT"`)
+- `trim`: Trimming method ("symmetric" or "asymmetric", default: no trimming)
+- `delta`: Threshold for symmetric trimming
+- `alpha`: Percentile for asymmetric trimming
+
+**Variance estimation:**
+
+- `variance_method`: "bootstrap" (default) or "robust"
+- `boot_level`: Bootstrap sampling level ("full" or "strata")
+- `B`: Number of bootstrap iterations
+- `parallel`, `mc.cores`, `seed`: Parallel computing and reproducibility
+- `robust`: Use robust variance in Cox model (default TRUE)
+
+### Basic Usage: Binary Treatment
+
+```{r marCoxph-basic}
+hr_result <- marCoxph(
+  data = simdata_bin,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  time_var = "time",
+  event_var = "event",
+  reference_level = "A",
+  estimand = "overlap"
+)
+
+print(hr_result)
+```
+
+The `reference_level` argument is mandatory and specifies the baseline group for hazard ratio comparisons.
+
+### Multiple Treatment Groups
+
+```{r marCoxph-multi}
+hr_multi <- marCoxph(
+  data = simdata_multi,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  time_var = "time",
+  event_var = "event",
+  reference_level = "A",
+  estimand = "ATE",
+  variance_method = "bootstrap",
+  B = 50,
+  seed = 456
+)
+
+print(hr_multi)
+```
+
+### Estimand Options
+
+Same as `surveff()`: ATE, ATT, and overlap weights are supported. Trimming options (symmetric/asymmetric) are also available.
+
+```{r marcoxph-estimands, eval=FALSE}
+# ATE (default)
+marCoxph(..., estimand = "ATE")
+
+# ATT targeting specific group
+marCoxph(..., estimand = "ATT", att_group = "treated")
+
+# Overlap weights
+marCoxph(..., estimand = "overlap")
+```
+
+### Trimming Options
+
+Propensity score trimming works identically to `surveff()`:
+
+```{r marcoxph-trimming, eval=FALSE}
+# Symmetric trimming
+marCoxph(..., estimand = "ATE", trim = "symmetric", delta = 0.1)
+
+# Asymmetric trimming
+marCoxph(..., estimand = "ATE", trim = "asymmetric", alpha = 0.05)
+```
+
+### Variance Options
+
+Two variance estimation methods:
+
+- **`"bootstrap"`** (default): Resamples the entire analysis pipeline (propensity scores, weights, and Cox model)
+- **`"robust"`**: Uses sandwich variance from `coxph()` directly (faster, no resampling)
+
+```{r marCoxph-variance, eval=FALSE}
+# Bootstrap variance (default)
+marCoxph(..., variance_method = "bootstrap", B = 200)
+
+# Robust sandwich variance (no bootstrap)
+marCoxph(..., variance_method = "robust")
+```
+
+The `boot_level` argument (`"full"` or `"strata"`) also applies here when using bootstrap variance, with the same interpretation as in `surveff()`.
+
+### Summary Output
+
+The `summary()` method provides detailed results with confidence intervals on both log and original scales:
+
+```{r summary-marcoxph}
+summary(hr_multi, conf_level = 0.95)
+```
+
+**Output styles**:
+
+- **`style = "prints"`** (default): Displays formatted tables with log hazard ratios and exponentiated hazard ratios
+- **`style = "returns"`**: Returns a list containing:
+  - `logHR`, `logHR_CI_lower`, `logHR_CI_upper`: Log-scale estimates and CIs
+  - `HR`, `HR_CI_lower`, `HR_CI_upper`: Original-scale estimates and CIs
+  - `SE`: Standard errors for log-scale hazard ratio (from specified variance method)
+  - `n_per_group`, `events_per_group`: Sample sizes and event counts
+
+```{r summary-marcoxph-returns}
+summ_hr <- summary(hr_multi, style = "returns")
+names(summ_hr)
+summ_hr$HR  # Exponentiated hazard ratios
+```
+
+## Summary
+
+| Feature | `surveff()` | `marCoxph()` |
+|---------|-------------|--------------|
+| Output | Survival curves, survival differences | Hazard ratios |
+| Estimands | ATE, ATT, overlap | ATE, ATT, overlap |
+| Censoring adjustment | Weibull or Cox | None (standard Cox) |
+| Variance | Analytical or bootstrap | Robust or bootstrap |
+| Trimming | Symmetric, asymmetric | Symmetric, asymmetric |
+| Multiple groups | Yes (with contrast_matrix) | Yes |
+
+## References
+
+Cheng, C., Li, F., Thomas, L. E., & Li, F. (2022). Addressing extreme propensity scores in estimating counterfactual survival functions via the overlap weights. *American Journal of Epidemiology*, 191(6), 1140-1151.
+
+Li, F., & Li, F. (2019). Propensity score weighting for causal inference with multiple treatments. *The Annals of Applied Statistics*, 13(4), 2389-2415.

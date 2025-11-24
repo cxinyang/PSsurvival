@@ -1,0 +1,45 @@
+Package: PSsurvival
+Title: Propensity Score Weighting for Survival Analysis with Binary and Multiple Treatments
+Version: 0.1.0
+Authors@R: c(
+    person("Chengxin", "Yang",
+           email = "chengxin.yang@duke.edu",
+           role = c("aut", "cre")),
+    person("Chao", "Cheng",
+           email = "chaoc@wustl.edu",
+           role = "aut"),
+    person("Fan", "Li",
+           email="fl35@duke.edu",
+           role = "aut"),
+    person("Fan", "Li",
+           email = "fan.f.li@yale.edu",
+           role = "aut"))
+Description: Implements propensity score weighting methods for estimating
+    counterfactual survival functions and marginal hazard ratios in
+    observational studies with time-to-event outcomes. Supports binary and
+    multiple treatment groups with average treatment effect on the combined
+    full population (ATE), average treatment effect on the treated or target 
+    group (ATT), and overlap weighting estimands. Includes symmetric (Crump) 
+    and asymmetric (Sturmer) trimming options for extreme propensity scores. 
+    Variance estimation via analytical M-estimation or bootstrap. 
+    Methods based on Cheng et al. (2022) <doi:10.1093/aje/kwac043> and Li & 
+    Li (2019) <doi:10.1214/19-AOAS1282>.
+License: GPL (>= 2)
+Depends:
+    R (>= 3.5.0)
+Imports:
+    survival,
+    stats,
+    utils
+Suggests:
+    nnet,
+    ggplot2,
+    parallel,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2
+Config/testthat/edition: 3
+VignetteBuilder: knitr

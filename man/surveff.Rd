@@ -78,9 +78,9 @@ For Cox: passed to \code{coxph()}, default \code{list()}.}
 \item{ps_control}{Control parameters for propensity score model. Default \code{list()}.}
 
 \item{boot_level}{Bootstrap sampling level: "full" (default) or "strata".
-"full" resamples from entire dataset (observational studies). "strata"
-resamples within treatment groups preserving group sizes (RCTs). Only
-used if variance_method = "bootstrap".}
+"full" resamples from entire dataset (standard for observational studies). "strata"
+resamples within each treatment group preserving group sizes (useful when treatment assignment 
+follows a stratified or fixed-ratio design). Only used if \code{variance_method = "bootstrap"}.}
 }
 \value{
 List containing:

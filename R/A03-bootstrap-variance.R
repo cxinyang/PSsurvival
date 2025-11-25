@@ -274,9 +274,9 @@ var_surv_weibull_bootstrap <- function(data, surv_result, treatment_var, time_va
 #' @param mc.cores Number of cores for parallel computation. Default 2.
 #' @param seed Optional random seed for reproducibility. Ensures identical results
 #'   across runs and between sequential and parallel execution. Default NULL.
-#' @param boot_level Bootstrap sampling level: "full" (default) or "strata".
-#'   "full" resamples from entire dataset (observational studies). "strata"
-#'   resamples within treatment groups preserving group sizes (RCTs).
+#' @param boot_level Bootstrap sampling level: "full" (default) samples from
+#'   entire dataset, "strata" samples within each treatment group preserving
+#'   group sizes.
 #'
 #' @return List containing:
 #'   \item{var_matrix}{Matrix [time x group] of bootstrap variances.}

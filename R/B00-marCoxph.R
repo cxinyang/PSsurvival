@@ -23,9 +23,9 @@
 #'   "bootstrap" resamples the entire analysis pipeline. "robust" uses the sandwich
 #'   variance estimator from \code{coxph()} without bootstrap.
 #' @param boot_level Bootstrap sampling level: "full" (default) or "strata".
-#'   "full" resamples from entire dataset (observational studies). "strata"
-#'   resamples within treatment groups preserving group sizes (RCTs). Only
-#'   used if \code{variance_method = "bootstrap"}.
+#'   "full" resamples from entire dataset (standard for observational studies). "strata"
+#'   resamples within each treatment group preserving group sizes (useful when treatment assignment 
+#'   follows a stratified or fixed-ratio design). Only used if \code{variance_method = "bootstrap"}.
 #' @param B Number of bootstrap iterations. Default 100. Used only if \code{variance_method = "bootstrap"}.
 #' @param parallel Logical. Use parallel bootstrap computation? Default FALSE.
 #' @param mc.cores Number of cores for parallel bootstrap. Default 2.

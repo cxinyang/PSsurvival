@@ -202,8 +202,9 @@ surv_cox <- function(data, time_var, event_var, treatment_var,
 #' @param ties Tie handling method for Cox model. Default "efron".
 #' @param ps_control Control parameters for PS model. Default \code{list()}.
 #' @param boot_level Bootstrap sampling level: "full" (default) or "strata".
-#'   "full" resamples from entire dataset (observational studies). "strata"
-#'   resamples within treatment groups preserving group sizes (RCTs).
+#'   "full" resamples from entire dataset (standard for observational studies). "strata"
+#'   resamples within each treatment group preserving group sizes (useful when treatment assignment 
+#'   follows a stratified or fixed-ratio design). Only used if \code{variance_method = "bootstrap"}.
 #'
 #' @return List containing:
 #'   \item{survival_estimates}{Matrix [time x J] of survival function estimates.}

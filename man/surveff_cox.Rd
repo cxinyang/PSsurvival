@@ -73,8 +73,9 @@ For >2 groups, required to estimate differences (otherwise returns NULL).}
 \item{ps_control}{Control parameters for PS model. Default \code{list()}.}
 
 \item{boot_level}{Bootstrap sampling level: "full" (default) or "strata".
-"full" resamples from entire dataset (observational studies). "strata"
-resamples within treatment groups preserving group sizes (RCTs).}
+"full" resamples from entire dataset (standard for observational studies). "strata"
+resamples within each treatment group preserving group sizes (useful when treatment assignment 
+follows a stratified or fixed-ratio design). Only used if \code{variance_method = "bootstrap"}.}
 }
 \value{
 List containing:

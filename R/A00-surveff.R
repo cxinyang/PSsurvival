@@ -41,9 +41,9 @@ utils::globalVariables(c("Time", "Estimate", "Strata", "CI_lower", "CI_upper"))
 #' @param ties Tie handling method for Cox models. Default "efron". Ignored for Weibull.
 #' @param ps_control Control parameters for propensity score model. Default \code{list()}.
 #' @param boot_level Bootstrap sampling level: "full" (default) or "strata".
-#'   "full" resamples from entire dataset (observational studies). "strata"
-#'   resamples within treatment groups preserving group sizes (RCTs). Only
-#'   used if variance_method = "bootstrap".
+#'   "full" resamples from entire dataset (standard for observational studies). "strata"
+#'   resamples within each treatment group preserving group sizes (useful when treatment assignment 
+#'   follows a stratified or fixed-ratio design). Only used if \code{variance_method = "bootstrap"}.
 #'
 #' @return List containing:
 #'   \item{survival_estimates}{Matrix [time x J] of survival function estimates for each group.}

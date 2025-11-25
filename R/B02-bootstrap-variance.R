@@ -24,9 +24,9 @@
 #' @param trim Trimming method: NULL, "symmetric", or "asymmetric".
 #' @param delta Symmetric trimming threshold (NULL uses defaults).
 #' @param alpha Asymmetric trimming threshold (NULL uses defaults).
-#' @param boot_level Bootstrap sampling level: "full" (default) or "strata".
-#'   "full" resamples from entire dataset (observational studies). "strata"
-#'   resamples within treatment groups preserving group sizes (RCTs).
+#' @param boot_level Bootstrap sampling level: "full" (default) samples from
+#'   entire dataset, "strata" samples within each treatment group preserving
+#'   group sizes.
 #' @param B Integer number of bootstrap iterations. Default 100.
 #' @param robust Logical. Use robust variance in Cox model? Default TRUE.
 #' @param parallel Logical. If TRUE, use parallel computation via mclapply.

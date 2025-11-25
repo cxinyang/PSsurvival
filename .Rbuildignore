@@ -11,3 +11,5 @@
 ^R/FinalReviewRequirements\.md$
 ^devcheck_results\.md$
 ^.*-preview\.html$
+^CRAN-SUBMISSION$
+^cran-comments\.md$

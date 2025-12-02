@@ -1,5 +1,5 @@
 Package: PSsurvival
-Title: Propensity Score Weighting for Survival Analysis with Binary and Multiple Treatments
+Title: Propensity Score Methods for Survival Analysis
 Version: 0.1.0
 Authors@R: c(
     person("Chengxin", "Yang",

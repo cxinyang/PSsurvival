@@ -4,7 +4,7 @@
 [![R-CMD-check](https://github.com/cxinyang/PSsurvival/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/cxinyang/PSsurvival/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-Propensity score weighting methods for causal survival analysis with binary and multiple treatments.
+Propensity score methods for survival analysis.
 
 ## Overview
 

@@ -51,16 +51,4 @@ Fits Cox models within each treatment group. Censoring scores computed as:
 where \eqn{H_0^{(j)}(t)} is cumulative baseline hazard. Baseline hazards
 evaluated at nearest time point for each individual.
 }
-\examples{
-\dontrun{
-# If event coded as: event=1, censored=0
-cs <- estimate_censoring_score_cox(
-  data = data,
-  time_var = "time",
-  treatment_var = "Z",
-  formula = Surv(time, I(1-event)) ~ X1 + X2
-)
-}
-
-}
 \keyword{internal}

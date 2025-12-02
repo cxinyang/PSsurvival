@@ -384,7 +384,7 @@ trim_weights_asymmetric <- function(ps_result, data, treatment_var, alpha = NULL
 #'   (default), uses recommended values from Yoshida et al. (2019). Ignored unless
 #'   trim = "asymmetric".
 #'
-#' @return A list with class "PSweight_estimate" containing:
+#' @return A list containing:
 #'   \item{weights}{Numeric vector of weights (length = nrow(data)).}
 #'   \item{trim_summary}{Data frame with trimming summary by treatment group.}
 #'   \item{ess}{Named numeric vector of effective sample size by treatment group.}
@@ -408,47 +408,37 @@ trim_weights_asymmetric <- function(ps_result, data, treatment_var, alpha = NULL
 #' Overlap weights do not support trimming (already bounded in [0,1]).
 #'
 #' @examples
-#' \dontrun{
-#' ps_result <- estimate_ps(
-#'   data = example_data,
+#' \donttest{
+#' # Example 1: Overlap weighting for binary treatment
+#' data(simdata_bin)
+#' ps_bin <- estimate_ps(
+#'   data = simdata_bin,
 #'   treatment_var = "Z",
-#'   ps_formula = Z ~ X1 + X2 + X3
+#'   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2
 #' )
-#'
-#' # ATE estimation
-#' weights_ate <- estimate_weights(
-#'   ps_result = ps_result,
-#'   data = example_data,
-#'   treatment_var = "Z",
-#'   estimand = "ATE"
-#' )
-#'
-#' # ATT estimation (att_group is mandatory)
-#' weights_att <- estimate_weights(
-#'   ps_result = ps_result,
-#'   data = example_data,
-#'   treatment_var = "Z",
-#'   estimand = "ATT",
-#'   att_group = "treated"
-#' )
-#'
-#' # ATE with symmetric trimming
-#' weights_ate_trim <- estimate_weights(
-#'   ps_result = ps_result,
-#'   data = example_data,
-#'   treatment_var = "Z",
-#'   estimand = "ATE",
-#'   trim = "symmetric",
-#'   delta = 0.1
-#' )
-#'
-#' # Overlap population
-#' weights_overlap <- estimate_weights(
-#'   ps_result = ps_result,
-#'   data = example_data,
+#' weights_ow <- estimate_weights(
+#'   ps_result = ps_bin,
+#'   data = simdata_bin,
 #'   treatment_var = "Z",
 #'   estimand = "overlap"
 #' )
+#' summary(weights_ow$weights)
+#'
+#' # Example 2: ATT with multiple treatments
+#' data(simdata_multi)
+#' ps_multi <- estimate_ps(
+#'   data = simdata_multi,
+#'   treatment_var = "Z",
+#'   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2
+#' )
+#' weights_att <- estimate_weights(
+#'   ps_result = ps_multi,
+#'   data = simdata_multi,
+#'   treatment_var = "Z",
+#'   estimand = "ATT",
+#'   att_group = "C"
+#' )
+#' summary(weights_att$weights)
 #' }
 #'
 #' @references
@@ -623,59 +613,5 @@ estimate_weights <- function(ps_result, data, treatment_var,
     ps_result = ps_result_final
   )
 
-  class(result) <- "PSweight_estimate"
   return(result)
-}
-
-
-#' Print Method for PSweight_estimate Objects
-#'
-#' @param x An object of class "PSweight_estimate".
-#' @param ... Additional arguments (currently unused).
-#'
-#' @export
-print.PSweight_estimate <- function(x, ...) {
-  cat("Propensity Score Weights\n")
-  cat("========================\n\n")
-
-  cat("Estimand:", x$estimand, "\n")
-  cat("Method:", x$method, "\n")
-  if (!is.null(x$att_group)) {
-    cat("ATT target group:", x$att_group, "\n")
-  }
-
-  cat("\nTreatment levels:", length(x$treatment_levels),
-      "(", paste(x$treatment_levels, collapse = ", "), ")\n")
-
-  if (!is.null(x$trim_method)) {
-    cat("\nTrimming:", x$trim_method, "\n")
-    print(x$trim_summary, row.names = FALSE)
-  } else {
-    cat("\nNo trimming applied\n")
-  }
-
-  cat("\nEffective sample size by treatment group:\n")
-  ess_df <- data.frame(
-    treatment = names(x$ess),
-    ESS = round(x$ess, 2)
-  )
-  print(ess_df, row.names = FALSE)
-
-  cat("\nWeight summary (non-zero weights only):\n")
-  weight_summary <- summary(x$weights[x$weights > 0])
-  print(weight_summary)
-
-  invisible(x)
-}
-
-
-#' Summary Method for PSweight_estimate Objects
-#'
-#' @param object An object of class "PSweight_estimate".
-#' @param ... Additional arguments (currently unused).
-#'
-#' @export
-summary.PSweight_estimate <- function(object, ...) {
-  print(object)
-  invisible(object)
 }

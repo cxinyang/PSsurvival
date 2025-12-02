@@ -49,16 +49,4 @@ Fits Weibull models within each treatment group. Censoring scores computed as:
 \deqn{K_c^{(j)}(t, X) = \exp(-\exp(X'\theta_j) \cdot t^{\gamma_j})}
 where \eqn{\theta_j = -\beta_j/\sigma_j}, \eqn{\gamma_j = 1/\sigma_j}.
 }
-\examples{
-\dontrun{
-# If event coded as: event=1, censored=0
-cs <- estimate_censoring_score_weibull(
-  data = data,
-  time_var = "time",
-  treatment_var = "Z",
-  formula = Surv(time, I(1-event)) ~ X1 + X2
-)
-}
-
-}
 \keyword{internal}

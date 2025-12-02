@@ -69,31 +69,25 @@ P(Z = observed | X) for each individual from the generalized PS matrix.
 }
 }
 \examples{
-\dontrun{
-# Binary treatment example
-data(example_data)
-result <- estimate_ps(
-  data = example_data,
+\donttest{
+# Example 1: Binary treatment
+data(simdata_bin)
+ps_bin <- estimate_ps(
+  data = simdata_bin,
   treatment_var = "Z",
-  ps_formula = Z ~ X1 + X2 + X3,
-  ps_control = list()
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2
 )
+summary(ps_bin$ps)
+table(simdata_bin$Z)
 
-# Examine propensity scores
-summary(result$ps)
-hist(result$ps)
-
-# Multiple treatment example
-result_multi <- estimate_ps(
-  data = example_data_multi,
+# Example 2: Multiple treatments
+data(simdata_multi)
+ps_multi <- estimate_ps(
+  data = simdata_multi,
   treatment_var = "Z",
-  ps_formula = Z ~ X1 + X2 + X3,
-  ps_control = list(trace = FALSE)
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2
 )
-
-# Examine generalized propensity scores
-head(result_multi$ps_matrix)  # Probabilities for all treatment levels
-summary(result_multi$ps)       # Probability of actual treatment received
+head(ps_multi$ps_matrix)
 }
 
 }

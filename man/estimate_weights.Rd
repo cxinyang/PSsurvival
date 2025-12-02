@@ -48,7 +48,7 @@ from Yoshida et al. (2019). Ignored unless trim = "symmetric".}
 trim = "asymmetric".}
 }
 \value{
-A list with class "PSweight_estimate" containing:
+A list containing:
   \item{weights}{Numeric vector of weights (length = nrow(data)).}
   \item{trim_summary}{Data frame with trimming summary by treatment group.}
   \item{ess}{Named numeric vector of effective sample size by treatment group.}
@@ -77,47 +77,37 @@ distribution while weights reflect the overlapping population.
 Overlap weights do not support trimming (already bounded in [0,1]).
 }
 \examples{
-\dontrun{
-ps_result <- estimate_ps(
-  data = example_data,
+\donttest{
+# Example 1: Overlap weighting for binary treatment
+data(simdata_bin)
+ps_bin <- estimate_ps(
+  data = simdata_bin,
   treatment_var = "Z",
-  ps_formula = Z ~ X1 + X2 + X3
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2
 )
-
-# ATE estimation
-weights_ate <- estimate_weights(
-  ps_result = ps_result,
-  data = example_data,
-  treatment_var = "Z",
-  estimand = "ATE"
-)
-
-# ATT estimation (att_group is mandatory)
-weights_att <- estimate_weights(
-  ps_result = ps_result,
-  data = example_data,
-  treatment_var = "Z",
-  estimand = "ATT",
-  att_group = "treated"
-)
-
-# ATE with symmetric trimming
-weights_ate_trim <- estimate_weights(
-  ps_result = ps_result,
-  data = example_data,
-  treatment_var = "Z",
-  estimand = "ATE",
-  trim = "symmetric",
-  delta = 0.1
-)
-
-# Overlap population
-weights_overlap <- estimate_weights(
-  ps_result = ps_result,
-  data = example_data,
+weights_ow <- estimate_weights(
+  ps_result = ps_bin,
+  data = simdata_bin,
   treatment_var = "Z",
   estimand = "overlap"
 )
+summary(weights_ow$weights)
+
+# Example 2: ATT with multiple treatments
+data(simdata_multi)
+ps_multi <- estimate_ps(
+  data = simdata_multi,
+  treatment_var = "Z",
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2
+)
+weights_att <- estimate_weights(
+  ps_result = ps_multi,
+  data = simdata_multi,
+  treatment_var = "Z",
+  estimand = "ATT",
+  att_group = "C"
+)
+summary(weights_att$weights)
 }
 
 }

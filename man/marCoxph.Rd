@@ -128,44 +128,32 @@ estimated via bootstrap or robust sandwich estimator.
 - Not supported with overlap weights (already bounded [0,1]).
 }
 \examples{
-\dontrun{
-# Binary treatment with overlap weights
-result <- marCoxph(
-  data = mydata,
-  ps_formula = trt ~ age + sex,
+\donttest{
+# Example 1: Binary treatment with overlap weighting
+data(simdata_bin)
+result1 <- marCoxph(
+  data = simdata_bin,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
   time_var = "time",
   event_var = "event",
-  reference_level = "control",
+  reference_level = "A",
   estimand = "overlap"
 )
+summary(result1)
 
-# Multiple groups with ATE and symmetric trimming
-result <- marCoxph(
-  data = mydata,
-  ps_formula = group ~ age + sex + comorbidity,
-  time_var = "time",
-  event_var = "death",
-  reference_level = "A",
-  estimand = "ATE",
-  trim = "symmetric",
-  delta = 0.1,
-  variance_method = "bootstrap",
-  B = 500,
-  parallel = TRUE,
-  mc.cores = 4
-)
-
-# ATT with robust variance (no bootstrap)
-result <- marCoxph(
-  data = mydata,
-  ps_formula = trt ~ age + sex,
+# Example 2: Multiple treatments with ATT and robust variance
+data(simdata_multi)
+result2 <- marCoxph(
+  data = simdata_multi,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
   time_var = "time",
   event_var = "event",
-  reference_level = "control",
+  reference_level = "C",
   estimand = "ATT",
-  att_group = "treated",
+  att_group = "C",
   variance_method = "robust"
 )
+summary(result2)
 }
 
 }

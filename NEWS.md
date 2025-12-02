@@ -1,6 +1,12 @@
 # PSsurvival 0.1.0
 
-* Initial CRAN release (under review)
+* Initial CRAN release
+
+* Documentation improvements for CRAN resubmission:
+  - Added `@return` tags to print methods
+  - Removed examples from internal functions
+  - Updated examples to use `\donttest{}` with executable code
+  - Enhanced output documentation for all exported functions
 
 * Implements propensity score weighting methods for estimating counterfactual
   survival functions and marginal hazard ratios in observational studies with

@@ -1,11 +1,11 @@
 ---
-title: "PSsurvival: Propensity Score Weighting for Survival Analysis"
+title: "PSsurvival: Propensity Score Methods for Survival Analysis"
 output:
   rmarkdown::html_vignette:
     toc: true
     toc_depth: 3
 vignette: >
-  %\VignetteIndexEntry{PSsurvival: Propensity Score Weighting for Survival Analysis}
+  %\VignetteIndexEntry{PSsurvival: Propensity Score Methods for Survival Analysis}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-PSsurvival implements propensity score weighting methods for causal inference with time-to-event outcomes. The package provides two main functions:
+PSsurvival implements propensity score methods for causal inference with time-to-event outcomes. The package provides two main functions:
 
 - **`surveff()`**: Estimates counterfactual survival functions and survival differences
 - **`marCoxph()`**: Estimates marginal hazard ratios via weighted Cox regression

@@ -124,30 +124,31 @@ various weighting schemes (ATE, ATT, overlap) and optional trimming.
 - Multiple groups: Requires \code{contrast_matrix} for pairwise comparisons.
 }
 \examples{
-\dontrun{
-# Binary treatment with overlap weights
-result <- surveff(
-  data = mydata,
-  ps_formula = trt ~ age + sex,
-  censoring_formula = Surv(time, event) ~ age,
+\donttest{
+# Example 1: Binary treatment with overlap weighting and Weibull censoring model
+data(simdata_bin)
+result1 <- surveff(
+  data = simdata_bin,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  censoring_formula = survival::Surv(time, event) ~ X1 + B1,
   estimand = "overlap",
   censoring_method = "weibull"
 )
+summary(result1)
+plot(result1)
 
-# Multiple groups with ATE and symmetric trimming
-result <- surveff(
-  data = mydata,
-  ps_formula = group ~ age + sex + comorbidity,
-  censoring_formula = Surv(time, event) ~ age + comorbidity,
+# Example 2: Multiple treatments with ATE and Cox censoring model
+data(simdata_multi)
+result2 <- surveff(
+  data = simdata_multi,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  censoring_formula = survival::Surv(time, event) ~ X1 + B1,
   estimand = "ATE",
-  trim = "symmetric",
-  delta = 0.1,
   censoring_method = "cox",
   variance_method = "bootstrap",
-  B = 500,
-  parallel = TRUE,
-  mc.cores = 4
+  B = 100
 )
+summary(result2)
 }
 
 }

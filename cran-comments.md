@@ -1,63 +1,67 @@
-# CRAN Submission Comments - PSsurvival 0.1.0
+# CRAN Resubmission Comments - PSsurvival 0.1.0
 
-## Submission Date
-2025-01-24
+## Resubmission Date
+2025-12-02
+
+## Response to Reviewer Feedback
+
+Thank you for reviewing our package. We have addressed all issues raised:
+
+### 1. Missing \value Documentation for Print Methods
+
+**Issue:** `print.surveff()` and `print.marCoxph()` lacked `\value{}` tags in documentation.
+
+**Fixed:** Added `@return` tags to both functions (R/A00-surveff.R:312, R/B00-marCoxph.R:377). Both now document: "Invisibly returns the input object \code{x}."
+
+### 2. Examples for Unexported Functions
+
+**Issue:** Two internal functions (`estimate_censoring_score_weibull()`, `estimate_censoring_score_cox()`) included `\dontrun{}` examples.
+
+**Fixed:** Removed `@examples` sections from both functions (R/U04-censoring-scores.R). All 25 internal functions now have no examples, as required for `@keywords internal` functions.
+
+### 3. \dontrun{} vs \donttest{} Usage
+
+**Issue:** Examples used `\dontrun{}` instead of executable `\donttest{}`.
+
+**Fixed:** All examples for exported functions (`surveff()`, `marCoxph()`, `estimate_ps()`, `estimate_weights()`) now use `\donttest{}` and run with package data (`simdata_bin`, `simdata_multi`). Examples are executable and demonstrate realistic usage.
+
+### 4. Output Documentation Completeness
+
+**Issue:** Reviewer requested clear documentation of output structure, class, and meaning for all exported functions.
+
+**Verified:** All 9 exported functions have comprehensive `\value{}` sections explaining:
+- Structure: List components, dimensions, data types
+- Class: Object classes (e.g., "marCoxph", "surveff", ggplot2)
+- Meaning: Interpretation of each output component
+
+Spot-checked examples:
+- `surveff()`: 15 components documented with types and dimensions
+- `marCoxph()`: 18 components with class name explicitly stated
+- `estimate_ps()`: 5 components with matrix dimensions specified
+- `estimate_weights()`: 12 components with detailed explanations
 
 ## Test Environments
-- Local: macOS Sequoia 15.5, R 4.5.1 (0 errors, 0 warnings, 0 notes)
-- WinBuilder R-release 4.5.2 (0 errors, 0 warnings, 1 note)
-- WinBuilder R-devel (0 errors, 0 warnings, 1 note)
-- GitHub Actions:
-  - macOS-latest, R-release
-  - Windows-latest, R-release
-  - Ubuntu-latest, R-devel
-  - Ubuntu-latest, R-release
-  - Ubuntu-latest, R-oldrel-1
 
-## R CMD check results
-0 errors | 0 warnings | 1 note
+Tested on:
+- Local: macOS Sequoia 15.5, R 4.5.1
+- GitHub Actions (5 configurations)
 
-The single NOTE is:
-```
-* checking CRAN incoming feasibility ... NOTE
-Maintainer: 'Chengxin Yang <chengxin.yang@duke.edu>'
+## R CMD check Results
 
-New submission
+**Current status:** 0 errors | 0 warnings | 0 notes
 
-Possibly misspelled words in DESCRIPTION:
-  ATT (23:12)
-  Cheng (26:22)
-  Crump (23:71)
-  Sturmer (24:21)
-  al (26:31)
-  estimands (23:40)
-  et (26:28)
-```
+All documentation issues resolved. The package passes `devtools::check()` with no issues.
 
-These are all correct:
-- ATT: Acronym for "Average Treatment effect on the Treated"
-- Cheng, Crump, Sturmer: Author names from references
-- estimands: Valid statistical term (plural of estimand)
-- et al: Standard Latin abbreviation in citations
+## Additional Changes
 
-## Submission Comments Sent to CRAN
-This is a new submission.
-
-The package implements propensity score weighting methods for causal
-survival analysis with time-to-event outcomes.
-
-Test results:
-- Local macOS: 0 errors, 0 warnings, 0 notes
-- WinBuilder R-release: 0 errors, 0 warnings, 1 note
-- WinBuilder R-devel: 0 errors, 0 warnings, 1 note
-- GitHub Actions (5 platforms): All passing
-
-The single NOTE is for "New submission" and flagged technical terms
-(ATT, estimands) and author names (Cheng, Crump, Sturmer) in the
-DESCRIPTION, which are all correct.
+- Removed `PSweight_estimate` class and its print/summary methods for API consistency with `estimate_ps()` (which is also exported without S3 methods)
+- All internal functions verified to have `@keywords internal` and no examples
+- All exported functions with examples use `\donttest{}` with executable code
+- Changed the title to "Propensity Score Methods for Survival Analysis" for succinctness
 
 ## Notes
-- First CRAN submission
-- 99 passing unit tests using testthat
-- Comprehensive vignette included
-- All examples run successfully
+
+- This is a resubmission addressing reviewer feedback
+- 99 unit tests passing (testthat)
+- Comprehensive documentation verified for all functions
+- Examples use package datasets and demonstrate intended workflows

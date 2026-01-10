@@ -1,11 +1,13 @@
 ---
-title: "PSsurvival: Propensity Score Methods for Survival Analysis"
+title: "PSsurvival: Propensity Score Weighting for Survival Analysis"
 output:
-  rmarkdown::html_vignette:
+  html_document:
     toc: true
-    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
 vignette: >
-  %\VignetteIndexEntry{PSsurvival: Propensity Score Methods for Survival Analysis}
+  %\VignetteIndexEntry{PSsurvival: Propensity Score Weighting for Survival Analysis}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -19,20 +21,21 @@ knitr::opts_chunk$set(
 )
 ```
 
-## Introduction
+## 1. Introduction
 
-PSsurvival implements propensity score methods for causal inference with time-to-event outcomes. The package provides two main functions:
+PSsurvival implements propensity score weighting methods for causal inference with time-to-event outcomes. The package provides three main functions:
 
 - **`surveff()`**: Estimates counterfactual survival functions and survival differences
 - **`marCoxph()`**: Estimates marginal hazard ratios via weighted Cox regression
+- **`weightedKM()`**: Estimates weighted Kaplan-Meier and cumulative risk curves
 
-Both functions support binary and multiple treatment groups, multiple weighting schemes, and propensity score trimming.
+All functions support binary and multiple treatment groups, multiple weighting schemes (IPW, overlap weights, ATT), and propensity score trimming.
 
 ```{r load-package}
 library(PSsurvival)
 ```
 
-## Data
+## 2. Data for Vignette
 
 The package includes two simulated datasets:
 
@@ -56,7 +59,7 @@ Both datasets contain:
 - `time`: Follow-up time (range 0-20)
 - `event`: Event indicator (1 = event, 0 = censored)
 
-## Counterfactual Survival Analysis with `surveff()`
+## 3. `surveff()`: Counterfactual Survival Probabilities and Differences
 
 ### Key Arguments
 
@@ -70,11 +73,10 @@ Both datasets contain:
 
 **Weighting and trimming:**
 
-- `estimand`: Target estimand ("ATE", "ATT", or "overlap")
-- `att_group`: Target group for ATT (required if `estimand = "ATT"`)
-- `trim`: Trimming method ("symmetric" or "asymmetric", default: no trimming)
-- `delta`: Threshold for symmetric trimming
-- `alpha`: Percentile for asymmetric trimming
+- `weight_method`: Weighting method ("IPW", "OW", or "ATT")
+- `att_group`: Target group for ATT (required if `weight_method = "ATT"`)
+- `trim`: Logical, whether to apply symmetric trimming (default: FALSE)
+- `delta`: Threshold for symmetric trimming (default: `NULL` for automatic selection)
 
 **Variance estimation:**
 
@@ -91,14 +93,14 @@ result_bin <- surveff(
   data = simdata_bin,
   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
   censoring_formula = survival::Surv(time, event) ~ X1 + B1,
-  estimand = "overlap",
+  weight_method = "OW",
   censoring_method = "weibull"
 )
 
 print(result_bin, max.len = 3)
 ```
 
-The `ps_formula` specifies the propensity score model (treatment ~ covariates). The `censoring_formula` models the censoring distribution within each treatment group.
+The `ps_formula` specifies the propensity score model (treatment ~ covariates). The `censoring_formula` specifies the censoring models (Weibull or Cox) within each treatment group for estimating the censoring scores.
 
 ### Multiple Treatment Groups
 
@@ -113,13 +115,13 @@ contrast_mat <- matrix(
   nrow = 3, byrow = TRUE
 )
 colnames(contrast_mat) <- c("A", "B", "C", "D")  # Must match treatment levels
-rownames(contrast_mat) <- c("A vs B", "A vs C", "A vs D") # row names are optional
+rownames(contrast_mat) <- c("A vs B", "A vs C", "A vs D")
 
 result_multi <- surveff(
   data = simdata_multi,
   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
   censoring_formula = survival::Surv(time, event) ~ X1 + B1,
-  estimand = "ATE",
+  weight_method = "IPW",
   contrast_matrix = contrast_mat,
   censoring_method = "cox",
   variance_method = "bootstrap",
@@ -132,38 +134,54 @@ print(result_multi, max.len = 3)
 
 Without `contrast_matrix`, only group-specific survival functions are estimated (no differences in survivals).
 
-### Estimand Options
+```{r surveff-multi-trimmed}
+# with symmetric trimming
+result_multi_trimmed <- surveff(
+  data = simdata_multi,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  censoring_formula = survival::Surv(time, event) ~ X1 + B1,
+  weight_method = "IPW",
+  trim = TRUE,
+  delta = 0.15,
+  contrast_matrix = contrast_mat,
+  censoring_method = "cox",
+  variance_method = "bootstrap",
+  B = 50,
+  seed = 123
+)
 
-Three estimands are supported and estimated by corresponding weighting methods:
+print(result_multi_trimmed, max.len = 3)
+```
 
-- **ATE** (default): Average treatment effect for the entire population using inverse probability weighting (IPW)
-- **ATT**: Average treatment effect on the treated (requires `att_group`) using IPW with target-group specific tilting
-- **overlap**: Targets the overlap population where treatment groups have most similar covariate distributions using overlap weights
+### Weighting Methods
 
-```{r estimands, eval=FALSE}
-# ATE (default)
-surveff(..., estimand = "ATE")
+Three weighting methods are supported:
+
+- **IPW**: Inverse probability (of treatment) weighting, targets average treatment effect (ATE) for the entire population
+- **ATT**: Propensity score weighting tilted to a specific treatment group (requires `att_group`)
+- **OW**: Overlap weighting, targets the overlap population at clinical equipoise where treatment groups have most similar covariates
+
+```{r weight-methods, eval=FALSE}
+# IPW (targets ATE)
+surveff(..., weight_method = "IPW")
 
 # ATT targeting group B
-surveff(..., estimand = "ATT", att_group = "B")
+surveff(..., weight_method = "ATT", att_group = "B")
 
 # Overlap weights
-surveff(..., estimand = "overlap")
+surveff(..., weight_method = "OW")
 ```
 
 ### Propensity Score Trimming
 
-Trimming excludes observations with extreme propensity scores. Not available with overlap weights (which already downweight extremes).
-
-- **Symmetric** (Crump): Removes observations with PS below `delta` or above `1-delta` for any treatment
-- **Asymmetric** (Sturmer): Removes based on treatment-specific quantiles
+Symmetric trimming excludes observations with extreme propensity scores. Not available with overlap weights (which already downweight extremes). The Crump extension is used for multiple treatments.
 
 ```{r trimming, eval=FALSE}
-# Symmetric trimming
-surveff(..., estimand = "ATE", trim = "symmetric", delta = 0.1)
+# Symmetric trimming with default delta (automatic selection)
+surveff(..., weight_method = "IPW", trim = TRUE)
 
-# Asymmetric trimming
-surveff(..., estimand = "ATE", trim = "asymmetric", alpha = 0.05)
+# Symmetric trimming with custom delta
+surveff(..., weight_method = "IPW", trim = TRUE, delta = 0.1)
 ```
 
 ### Censoring Methods
@@ -242,25 +260,25 @@ The `plot()` method produces survival curves (`type = "surv"`) or treatment effe
 
 ```{r plot-surv, fig.width=7, fig.height=5}
 # Survival curves for all groups
-plot(result_multi, type = "surv", curve_width = 0.5)
+plot(result_multi, type = "surv")
 ```
 
 ```{r plot-survdiff, fig.width=7, fig.height=5}
 # Treatment effect curves
-plot(result_multi, type = "survdiff", curve_width = 0.5)
+plot(result_multi, type = "survdiff")
 ```
 
 **Selecting specific strata**: Use `strata_to_plot` to display a subset of groups or contrasts.
 
 ```{r plot-subset-surv, fig.width=7, fig.height=5}
 # Only groups A and C
-plot(result_multi, type = "surv", curve_width = 0.5,
+plot(result_multi, type = "surv",
      strata_to_plot = c("A", "C"))
 ```
 
 ```{r plot-subset-diff, fig.width=7, fig.height=5}
 # Only specific contrasts (names must match contrast_matrix rownames exactly)
-plot(result_multi, type = "survdiff", curve_width = 0.5,
+plot(result_multi, type = "survdiff",
      strata_to_plot = c("A vs B", "A vs D"))
 ```
 
@@ -279,7 +297,6 @@ plot(result_multi, type = "survdiff", curve_width = 0.5,
 ```{r plot-custom, fig.width=7, fig.height=5}
 plot(result_multi,
      type = "surv",
-     curve_width = 0.5,
      strata_to_plot = c("A", "B"),
      strata_colors = c("steelblue", "coral"),
      max_time = 15,
@@ -288,7 +305,7 @@ plot(result_multi,
      plot_title = "Survival by Treatment Group")
 ```
 
-## Marginal Hazard Ratios with `marCoxph()`
+## 4. `marCoxph()`: Marginal Hazard Ratios by Cox-PH model
 
 `marCoxph()` fits a weighted Cox model to estimate marginal hazard ratios.
 
@@ -300,15 +317,14 @@ plot(result_multi,
 - `ps_formula`: Propensity score model (`treatment ~ covariates`)
 - `time_var`: Name of time-to-event variable (character string)
 - `event_var`: Name of event indicator variable (character string, 1=event, 0=censored)
-- `reference_level`: Reference treatment level (MANDATORY)
+- `reference_level`: Reference treatment level in Cox model (MANDATORY)
 
 **Weighting and trimming:**
 
-- `estimand`: Target estimand ("ATE", "ATT", or "overlap")
-- `att_group`: Target group for ATT (required if `estimand = "ATT"`)
-- `trim`: Trimming method ("symmetric" or "asymmetric", default: no trimming)
-- `delta`: Threshold for symmetric trimming
-- `alpha`: Percentile for asymmetric trimming
+- `weight_method`: Weighting method ("IPW", "OW", or "ATT")
+- `att_group`: Target group for ATT (required if `weight_method = "ATT"`)
+- `trim`: Logical, whether to apply symmetric trimming (default: FALSE)
+- `delta`: Threshold for symmetric trimming (default: `NULL` for automatic selection)
 
 **Variance estimation:**
 
@@ -327,7 +343,7 @@ hr_result <- marCoxph(
   time_var = "time",
   event_var = "event",
   reference_level = "A",
-  estimand = "overlap"
+  weight_method = "OW"
 )
 
 print(hr_result)
@@ -344,7 +360,7 @@ hr_multi <- marCoxph(
   time_var = "time",
   event_var = "event",
   reference_level = "A",
-  estimand = "ATE",
+  weight_method = "IPW",
   variance_method = "bootstrap",
   B = 50,
   seed = 456
@@ -353,19 +369,37 @@ hr_multi <- marCoxph(
 print(hr_multi)
 ```
 
-### Estimand Options
+```{r marCoxph-multi-trimmed}
+hr_multi_trimmed <- marCoxph(
+  data = simdata_multi,
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  time_var = "time",
+  event_var = "event",
+  reference_level = "A",
+  weight_method = "IPW",
+  trim = TRUE,
+  delta = 0.15,
+  variance_method = "bootstrap",
+  B = 50,
+  seed = 456
+)
 
-Same as `surveff()`: ATE, ATT, and overlap weights are supported. Trimming options (symmetric/asymmetric) are also available.
+print(hr_multi_trimmed)
+```
 
-```{r marcoxph-estimands, eval=FALSE}
-# ATE (default)
-marCoxph(..., estimand = "ATE")
+### Weighting Methods
+
+Same as `surveff()`: IPW, ATT, and OW are supported.
+
+```{r marcoxph-weight-methods, eval=FALSE}
+# IPW (targets ATE)
+marCoxph(..., weight_method = "IPW")
 
 # ATT targeting specific group
-marCoxph(..., estimand = "ATT", att_group = "treated")
+marCoxph(..., weight_method = "ATT", att_group = "treated")
 
 # Overlap weights
-marCoxph(..., estimand = "overlap")
+marCoxph(..., weight_method = "OW")
 ```
 
 ### Trimming Options
@@ -373,11 +407,11 @@ marCoxph(..., estimand = "overlap")
 Propensity score trimming works identically to `surveff()`:
 
 ```{r marcoxph-trimming, eval=FALSE}
-# Symmetric trimming
-marCoxph(..., estimand = "ATE", trim = "symmetric", delta = 0.1)
+# Symmetric trimming with default delta
+marCoxph(..., weight_method = "IPW", trim = TRUE)
 
-# Asymmetric trimming
-marCoxph(..., estimand = "ATE", trim = "asymmetric", alpha = 0.05)
+# Symmetric trimming with custom delta
+marCoxph(..., weight_method = "IPW", trim = TRUE, delta = 0.1)
 ```
 
 ### Variance Options
@@ -420,19 +454,152 @@ names(summ_hr)
 summ_hr$HR  # Exponentiated hazard ratios
 ```
 
+## 5. `weightedKM()`: Kaplan-Meier or Cumulative Risk Curves with Propensity Score Weights
+
+`weightedKM()` estimates the survival probabilities at each observed time points, using weighted Kaplan-Meier (KM) estimator with propensity score weights. It uses the classic weighted Greenwood variance formula. `plot.weightedKM()` creates weighted KM or Cumulative Risk (CR) curves for visualization.
+
+### Key Arguments
+
+**Data specification:**
+
+- `data`: Data frame
+- `treatment_var`: Name of treatment variable (character string)
+- `time_var`: Name of time variable (character string)
+- `event_var`: Name of event indicator (character string, 1=event, 0=censored)
+
+**Weighting:**
+
+- `weight_method`: "IPW", "OW", "ATT", or "none" (classical unweighted KM)
+- `ps_formula`: Propensity score model (required unless `weight_method = "none"`)
+- `att_group`: Target group for ATT (required if `weight_method = "ATT"`)
+- `trim`: Logical, whether to apply symmetric trimming (default: FALSE)
+- `delta`: Threshold for symmetric trimming
+
+### Fit a `weightedKM()` Object
+
+#### Without Propensity Score Weights
+
+```{r weightedKM-basic}
+# Classical unweighted KM
+km_result <- weightedKM(
+  data = simdata_bin,
+  treatment_var = "Z",
+  time_var = "time",
+  event_var = "event",
+  weight_method = "none"
+)
+
+print(km_result)
+```
+
+#### With Propensity Score Weights
+
+```{r weightedKM-OW}
+# Overlap-weighted KM
+km_ow <- weightedKM(
+  data = simdata_bin,
+  treatment_var = "Z",
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  time_var = "time",
+  event_var = "event",
+  weight_method = "OW"
+)
+
+print(km_ow)
+```
+
+```{r weightedKM-IPW}
+# IPW-weighted KM with trimming
+km_ipw <- weightedKM(
+  data = simdata_multi,
+  treatment_var = "Z",
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  time_var = "time",
+  event_var = "event",
+  weight_method = "IPW",
+  trim = TRUE,
+  delta = 0.1
+)
+
+print(km_ipw)
+```
+
+### Creating Weighted KM or CR Curves
+
+`plot.weightedKM()` function visualizes a `weightedKM` object by survival (aka. Kaplan-Meier) curves or cumulative risk (aka. cumulative incidence) curves. By default, it produces curves with 0.95 confidence band and a risk table for all groups, with each group indicated by a specific color. It allows users to flexibly adjust the confidence band, risk table, colors, and other aesthetic components.
+
+#### Kaplan-Meier vs. CR
+
+Specified by `type`: `"Kaplan-Meier"` for Kaplan-Meier and `"CR"` for cumulative risk. Cumulative risk is defined as 1-KM.
+
+#### Confidence intervals
+
+Plot survival curves or cumulative risk curves with or without confidence intervals:
+
+```{r plot-weightedKM, fig.width=7, fig.height=5}
+# Survival curves with log CI
+plot(km_ow, type = "Kaplan-Meier", conf_type = "log")
+```
+
+```{r plot-weightedKM-CR, fig.width=7, fig.height=5}
+# Cumulative risk curves with log-log CI
+plot(km_ow, type = "CR", conf_type = "log-log")
+```
+
+**With or Without confidence intervals**: Specified by `include_CI` (default: TRUE).
+
+**Confidence interval types**: Three methods available via `conf_type`:
+
+- `"plain"`: Normal approximation (may exceed [0,1])
+- `"log"`: Log transformation (guarantees bounds in (0,1))
+- `"log-log"`: Complementary log-log transformation (best for extreme probabilities, default)
+
+The confidence intervals and corresponding transformation are calculated and performed on the scale of $\hat{S}(t)$ for Kaplan-Meier and of $1-\hat{S}(t)$ for cumulative risk, where $\hat{S}(t)$ is the estimated survival probability at time $t$.
+
+#### Risk Tables
+
+Display **weighted** number at risk and cumulative events below the curves:
+
+```{r plot-weightedKM-risktable, fig.width=7, fig.height=6}
+plot(km_ipw,
+     risk_table = TRUE,
+     risk_table_breaks = c(0, 5, 10, 15),
+     risk_table_height = 0.3,
+     risk_table_stats = c("n.risk", "n.acc.event"))
+```
+
+**Risk table customization**:
+
+- `risk_table`: Logical, add risk table (default FALSE)
+- `risk_table_stats`: Statistics to display: "n.risk" (number at risk), "n.acc.event" (cumulative events)
+- `risk_table_height`: Relative height of risk table (0-1, default 0.25)
+- `risk_table_breaks`: Time points for columns (default: automatic)
+- `risk_table_fontsize`: Font size (default 3.5)
+
+### Summary Output
+
+```{r summary-weightedKM}
+summary(km_ow, type = "Kaplan-Meier", conf_type = "log-log", print.rows = 5)
+```
+
+The summary returns a list of matrices (one per treatment group) with full-precision estimates, invisibly. Customize display with `print.digits` and `print.rows`.
+
 ## Summary
 
-| Feature | `surveff()` | `marCoxph()` |
-|---------|-------------|--------------|
-| Output | Survival curves, survival differences | Hazard ratios |
-| Estimands | ATE, ATT, overlap | ATE, ATT, overlap |
-| Censoring adjustment | Weibull or Cox | None (standard Cox) |
-| Variance | Analytical or bootstrap | Robust or bootstrap |
-| Trimming | Symmetric, asymmetric | Symmetric, asymmetric |
-| Multiple groups | Yes (with contrast_matrix) | Yes |
+| Feature | `surveff()` | `marCoxph()` | `weightedKM()` |
+|---------|-------------|--------------|----------------|
+| Output | Survival curves, survival differences | Hazard ratios | Weighted KM curves |
+| Weighting | IPW, ATT, OW | IPW, ATT, OW | IPW, ATT, OW, none |
+| Censoring adjustment | Weibull or Cox | None (standard Cox) | None |
+| Variance | Analytical or bootstrap | Robust or bootstrap | Weighted Greenwood |
+| Trimming | Symmetric | Symmetric | Symmetric |
+| Multiple groups | Yes (with contrast_matrix) | Yes | Yes |
+| Risk tables | No | No | Yes |
 
 ## References
 
-Cheng, C., Li, F., Thomas, L. E., & Li, F. (2022). Addressing extreme propensity scores in estimating counterfactual survival functions via the overlap weights. *American Journal of Epidemiology*, 191(6), 1140-1151.
+Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via propensity score weighting. *Journal of the American Statistical Association*, 113(521), 390-400.
 
 Li, F., & Li, F. (2019). Propensity score weighting for causal inference with multiple treatments. *The Annals of Applied Statistics*, 13(4), 2389-2415.
+
+Cheng, C., Li, F., Thomas, L. E., & Li, F. (2022). Addressing extreme propensity scores in estimating counterfactual survival functions via the overlap weights. *American Journal of Epidemiology*, 191(6), 1140-1151.

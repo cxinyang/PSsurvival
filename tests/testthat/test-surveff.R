@@ -5,7 +5,7 @@ test_that("surveff works with binary treatment and overlap weights", {
     data = data,
     ps_formula = Z ~ X1 + X2 + B1,
     censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "overlap",
+    weight_method = "OW",
     censoring_method = "weibull"
   )
 
@@ -23,7 +23,7 @@ test_that("surveff works with binary treatment and overlap weights", {
   # Check survival estimates in [0, 1]
   expect_true(all(result$survival_estimates >= 0 & result$survival_estimates <= 1))
 
-  # Check estimand recorded
+  # Check estimand recorded (internal mapping: OW -> overlap)
   expect_equal(result$estimand, "overlap")
 
   # Check treatment levels
@@ -38,7 +38,7 @@ test_that("surveff works with binary treatment and ATE (IPTW)", {
     data = data,
     ps_formula = Z ~ X1 + X2 + B1,
     censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "ATE",
+    weight_method = "IPW",
     censoring_method = "weibull"
   )
 
@@ -58,7 +58,7 @@ test_that("surveff works with binary treatment and ATT", {
     data = data,
     ps_formula = Z ~ X1 + X2 + B1,
     censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "ATT",
+    weight_method = "ATT",
     att_group = "B",
     censoring_method = "weibull"
   )
@@ -80,7 +80,7 @@ test_that("surveff works with multiple treatment groups and contrast matrix", {
     data = data,
     ps_formula = Z ~ X1 + X2 + B1,
     censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "ATE",
+    weight_method = "IPW",
     contrast_matrix = contrast_mat,
     censoring_method = "weibull"
   )
@@ -99,7 +99,7 @@ test_that("surveff works with multiple treatment groups and contrast matrix", {
   expect_equal(result$contrast_matrix, contrast_mat)
 })
 
-test_that("surveff trimming works (symmetric and asymmetric)", {
+test_that("surveff trimming works (symmetric)", {
   data <- make_test_data_binary(n = 150)
 
   # Symmetric trimming
@@ -107,8 +107,8 @@ test_that("surveff trimming works (symmetric and asymmetric)", {
     data = data,
     ps_formula = Z ~ X1 + X2 + B1,
     censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "ATE",
-    trim = "symmetric",
+    weight_method = "IPW",
+    trim = TRUE,
     delta = 0.1,
     censoring_method = "weibull"
   )
@@ -117,21 +117,6 @@ test_that("surveff trimming works (symmetric and asymmetric)", {
   expect_true(any(result_sym$weights == 0))
   expect_true(any(!result_sym$included))
   expect_equal(length(result_sym$included), result_sym$n)
-
-  # Asymmetric trimming
-  result_asym <- surveff(
-    data = data,
-    ps_formula = Z ~ X1 + X2 + B1,
-    censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "ATE",
-    trim = "asymmetric",
-    alpha = 0.05,
-    censoring_method = "weibull"
-  )
-
-  # Check some observations are trimmed
-  expect_true(any(result_asym$weights == 0))
-  expect_true(any(!result_asym$included))
 })
 
 test_that("surveff works with Cox censoring and bootstrap variance", {
@@ -141,7 +126,7 @@ test_that("surveff works with Cox censoring and bootstrap variance", {
     data = data,
     ps_formula = Z ~ X1 + X2 + B1,
     censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "overlap",
+    weight_method = "OW",
     censoring_method = "cox",
     variance_method = "bootstrap",
     B = 20,  # Small for speed
@@ -166,7 +151,7 @@ test_that("surveff summary and plot methods work", {
     data = data,
     ps_formula = Z ~ X1 + X2 + B1,
     censoring_formula = survival::Surv(time, event) ~ X1,
-    estimand = "overlap",
+    weight_method = "OW",
     censoring_method = "weibull"
   )
 

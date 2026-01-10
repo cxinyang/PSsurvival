@@ -7,7 +7,7 @@ test_that("marCoxph works with binary treatment and overlap weights", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "overlap",
+    weight_method = "OW",
     variance_method = "robust"
   )
 
@@ -41,7 +41,7 @@ test_that("marCoxph works with binary treatment and ATE (IPTW)", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "ATE",
+    weight_method = "IPW",
     variance_method = "robust"
   )
 
@@ -59,7 +59,7 @@ test_that("marCoxph works with binary treatment and ATT", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "ATT",
+    weight_method = "ATT",
     att_group = "B",
     variance_method = "robust"
   )
@@ -79,7 +79,7 @@ test_that("marCoxph works with multiple treatment groups", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "ATE",
+    weight_method = "IPW",
     variance_method = "robust"
   )
 
@@ -95,7 +95,7 @@ test_that("marCoxph works with multiple treatment groups", {
   expect_named(result$logHR_est, c("Z:B", "Z:C"))
 })
 
-test_that("marCoxph trimming works (symmetric and asymmetric)", {
+test_that("marCoxph trimming works (symmetric)", {
   data <- make_test_data_binary(n = 150)
 
   # Symmetric trimming
@@ -105,8 +105,8 @@ test_that("marCoxph trimming works (symmetric and asymmetric)", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "ATE",
-    trim = "symmetric",
+    weight_method = "IPW",
+    trim = TRUE,
     delta = 0.1,
     variance_method = "robust"
   )
@@ -116,23 +116,6 @@ test_that("marCoxph trimming works (symmetric and asymmetric)", {
 
   # Check sample size reduced due to trimming
   expect_true(sum(result_sym$n_coxph_fitted) < 150)
-
-  # Asymmetric trimming
-  result_asym <- marCoxph(
-    data = data,
-    ps_formula = Z ~ X1 + X2 + B1,
-    time_var = "time",
-    event_var = "event",
-    reference_level = "A",
-    estimand = "ATE",
-    trim = "asymmetric",
-    alpha = 0.05,
-    variance_method = "robust"
-  )
-
-  # Check runs and sample size reduced
-  expect_s3_class(result_asym, "marCoxph")
-  expect_true(sum(result_asym$n_coxph_fitted) < 150)
 })
 
 test_that("marCoxph bootstrap variance works with full and strata sampling", {
@@ -145,7 +128,7 @@ test_that("marCoxph bootstrap variance works with full and strata sampling", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "overlap",
+    weight_method = "OW",
     variance_method = "bootstrap",
     boot_level = "full",
     B = 20,  # Small for speed
@@ -169,7 +152,7 @@ test_that("marCoxph bootstrap variance works with full and strata sampling", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "overlap",
+    weight_method = "OW",
     variance_method = "bootstrap",
     boot_level = "strata",
     B = 20,
@@ -190,7 +173,7 @@ test_that("marCoxph summary method works", {
     time_var = "time",
     event_var = "event",
     reference_level = "A",
-    estimand = "overlap",
+    weight_method = "OW",
     variance_method = "robust"
   )
 

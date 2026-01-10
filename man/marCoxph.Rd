@@ -10,11 +10,10 @@ marCoxph(
   time_var,
   event_var,
   reference_level,
-  estimand = "ATE",
+  weight_method = "IPW",
   att_group = NULL,
-  trim = NULL,
+  trim = FALSE,
   delta = NULL,
-  alpha = NULL,
   variance_method = "bootstrap",
   boot_level = "full",
   B = 100,
@@ -38,16 +37,22 @@ Should be coded as 1=event, 0=censored.}
 \item{reference_level}{Treatment level to use as reference in Cox model. MANDATORY.
 Must be one of the treatment levels.}
 
-\item{estimand}{Target estimand: "ATE" (average treatment effect), "ATT" (average
-treatment effect on the treated), or "overlap" (overlap weighting). Default "ATE".}
+\item{weight_method}{Weighting method: "IPW" (inverse probability weighting),
+"OW" (overlap weighting), or "ATT" (average treatment effect on the treated).
+Default "IPW".}
 
-\item{att_group}{Target group for ATT. Required if \code{estimand = "ATT"}.}
+\item{att_group}{Target group for ATT. Required if \code{weight_method = "ATT"}.}
 
-\item{trim}{Trimming method: "symmetric" or "asymmetric". Default NULL (no trimming).}
+\item{trim}{Logical. Perform symmetric propensity score trimming? Default FALSE.
+If TRUE, symmetric trimming is applied (Crump extension for multiple treatments).
+See \code{\link{estimate_weights}} for trimming details. Ignored if
+\code{weight_method = "OW"}. Asymmetric trimming is no longer supported due to
+poor statistical performance.}
 
-\item{delta}{Threshold for symmetric trimming (e.g., 0.1). Required if \code{trim = "symmetric"}.}
-
-\item{alpha}{Percentile for asymmetric trimming (e.g., 0.05). Required if \code{trim = "asymmetric"}.}
+\item{delta}{Threshold for symmetric trimming in \eqn{(0, 1/J]}, where \eqn{J} is the number
+of treatment levels. Default NULL uses recommended values: 0.1 for binary
+treatment, 0.067 for 3 groups, \eqn{1/(2J)} for \eqn{J \ge 4} (Yoshida et al., 2019).
+Used only if \code{trim = TRUE}.}
 
 \item{variance_method}{Variance estimation method: "bootstrap" (default) or "robust".
 "bootstrap" resamples the entire analysis pipeline. "robust" uses the sandwich
@@ -103,15 +108,37 @@ Object of class "marCoxph" containing:
 \description{
 Main user interface for estimating marginal hazard ratios using propensity
 score weighting. Supports binary and multiple treatment groups with various
-weighting schemes (ATE, ATT, overlap) and optional trimming. Variance can be
+weighting schemes (IPW, OW, or ATT) and optional trimming. Variance can be
 estimated via bootstrap or robust sandwich estimator.
 }
 \details{
+**Weighting Methods:**
+
+The \code{weight_method} parameter specifies the target population for causal
+inference:
+
+\itemize{
+  \item \strong{IPW (Inverse Probability Weighting)}: Observations are weighted
+    by the inverse probability of their observed treatment, \eqn{w_i = 1/e_j(X_i)}
+    where j is the observed treatment group. Inference targets the combined
+    population (ATE type).
+
+  \item \strong{OW (Overlap Weighting)}: Observations are weighted by overlap
+    weights, which extends to multiple treatment groups (Li et al., 2018;
+    Li and Li, 2019). Inference targets the population at clinical equipoise
+    (overlap population).
+
+  \item \strong{ATT (Average Treatment Effect on the Treated)}: IPW weights
+    tilted toward a specified target group. Observations in the target group
+    receive weight 1, others receive \eqn{w_i = e_{\text{target}}(X_i) / e_j(X_i)}.
+    Inference targets the specified treatment group population (ATT type).
+}
+
 **Analysis Workflow:**
 1. Extract treatment variable from \code{ps_formula}.
 2. Estimate propensity scores using multinomial logistic regression (or logistic
    for binary treatment).
-3. Calculate propensity score weights based on \code{estimand} and optional \code{trim}.
+3. Calculate propensity score weights based on \code{weight_method} and optional \code{trim}.
 4. Fit marginal Cox model \code{Surv(time, event) ~ treatment} with weights.
 5. Estimate variance via bootstrap (resampling full pipeline) or robust sandwich
    estimator.
@@ -121,11 +148,6 @@ estimated via bootstrap or robust sandwich estimator.
   re-fits Cox model. Provides bootstrap SE for log hazard ratios.
 - \code{robust}: Uses robust sandwich variance from \code{coxph()} directly. No
   bootstrap performed (faster but may be less accurate with extreme weights).
-
-**Trimming:**
-- Symmetric: Crump extension for multiple treatments (Yoshida et al., 2019).
-- Asymmetric: Sturmer extension for multiple treatments (Yoshida et al., 2019).
-- Not supported with overlap weights (already bounded [0,1]).
 }
 \examples{
 \donttest{
@@ -137,7 +159,7 @@ result1 <- marCoxph(
   time_var = "time",
   event_var = "event",
   reference_level = "A",
-  estimand = "overlap"
+  weight_method = "OW"
 )
 summary(result1)
 
@@ -149,7 +171,7 @@ result2 <- marCoxph(
   time_var = "time",
   event_var = "event",
   reference_level = "C",
-  estimand = "ATT",
+  weight_method = "ATT",
   att_group = "C",
   variance_method = "robust"
 )
@@ -158,6 +180,10 @@ summary(result2)
 
 }
 \references{
+Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via
+propensity score weighting. \emph{Journal of the American Statistical Association},
+113(521), 390-400.
+
 Li, F., & Li, F. (2019). Propensity score weighting for causal inference with
 multiple treatments. \emph{The Annals of Applied Statistics}, 13(4), 2389-2415.
 

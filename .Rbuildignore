@@ -13,3 +13,5 @@
 ^.*-preview\.html$
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
+^doc$
+^Meta$

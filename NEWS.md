@@ -1,3 +1,87 @@
+# PSsurvival 0.2.0
+
+## Breaking Changes
+
+* **API Unification**: Changed `estimand` parameter to `weight_method` in `surveff()` and `marCoxph()` for consistency across all package functions
+  - `estimand = "ATE"` → `weight_method = "IPW"`
+  - `estimand = "overlap"` → `weight_method = "OW"`
+  - `estimand = "ATT"` → `weight_method = "ATT"` (name unchanged, but parameter name changed)
+
+* Changed `trim` parameter from character to logical in `surveff()`, `marCoxph()`, and `weightedKM()`
+  - `trim = "symmetric"` → `trim = TRUE`
+  - `trim = NULL` → `trim = FALSE`
+
+* Removed `alpha` parameter and asymmetric trimming support from all functions due to poor statistical performance in practice
+  - Only symmetric trimming (Crump extension for multiple treatments) is now supported
+
+* Default `delta` is now `NULL` (automatic selection based on number of treatment groups) instead of a fixed value
+
+## New Features
+
+* **New function**: `weightedKM()` for weighted Kaplan-Meier estimation with propensity score weights
+  - Supports IPW, overlap weights, ATT, and classical unweighted Kaplan-Meier
+  - Uses classic weighted Greenwood variance formula
+  - Handles binary and multiple treatment groups
+
+* **New S3 methods** for `weightedKM` objects:
+  - `plot.weightedKM()`: Visualize weighted Kaplan-Meier or cumulative risk curves with confidence intervals
+  - `summary.weightedKM()`: Tabular summaries with confidence intervals
+  - `print.weightedKM()`: Formatted console output
+
+* **Risk table support** in `plot.weightedKM()`:
+  - Display number at risk and cumulative events below survival/risk curves
+  - Customizable statistics, breaks, height, and font size
+  - Automatic group name positioning and formatting
+
+* **Enhanced visualization options**:
+  - Three confidence interval types: plain, log, log-log (default)
+  - Cumulative risk plots (1 - survival)
+  - Customizable colors, widths, transparency, and legends
+
+## Documentation
+
+* Unified weighting method descriptions across all main functions (`surveff()`, `marCoxph()`, `weightedKM()`)
+* Added comprehensive `@details` sections explaining IPW, OW, and ATT weighting methods
+* Updated all examples to use new API with `weight_method` parameter
+
+## Internal
+
+* Moved `ggplot2` and `cowplot` from Suggests to Imports (required for plotting functions)
+* Parameter mapping layer in `surveff()` and `marCoxph()` to transform user-facing API to internal implementation
+
+## Migration Guide for Existing Users
+
+If upgrading from version 0.1.0:
+
+* Replace `estimand = "ATE"` with `weight_method = "IPW"`
+* Replace `estimand = "overlap"` with `weight_method = "OW"`
+* Replace `estimand = "ATT"` with `weight_method = "ATT"`
+* Replace `trim = "symmetric", delta = 0.1` with `trim = TRUE, delta = 0.1`
+* Replace `trim = NULL` with `trim = FALSE` (or simply omit, as FALSE is default)
+* Remove `alpha` parameter entirely (asymmetric trimming no longer supported)
+* Set `delta = NULL` to use automatic defaults (0.1 for binary, 0.067 for 3 groups, 1/(2J) for J ≥ 4)
+
+Example migration:
+```r
+# Old (v0.1.0)
+result <- surveff(
+  data = mydata,
+  ps_formula = Z ~ X1 + X2,
+  censoring_formula = Surv(time, event) ~ X1,
+  estimand = "overlap",
+  censoring_method = "weibull"
+)
+
+# New (v0.2.0)
+result <- surveff(
+  data = mydata,
+  ps_formula = Z ~ X1 + X2,
+  censoring_formula = Surv(time, event) ~ X1,
+  weight_method = "OW",
+  censoring_method = "weibull"
+)
+```
+
 # PSsurvival 0.1.0
 
 * Initial CRAN release

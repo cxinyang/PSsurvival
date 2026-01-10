@@ -9,11 +9,10 @@ surveff(
   ps_formula,
   censoring_formula,
   eval_times = NULL,
-  estimand = "ATE",
+  weight_method = "IPW",
   att_group = NULL,
-  trim = NULL,
+  trim = FALSE,
   delta = NULL,
-  alpha = NULL,
   contrast_matrix = NULL,
   censoring_method = "weibull",
   variance_method = NULL,
@@ -38,16 +37,22 @@ Event should be coded as 1=event, 0=censored. Use \code{I(1-event)} if reversed.
 \item{eval_times}{Numeric vector of time points for evaluation. If NULL (default),
 uses all unique event times.}
 
-\item{estimand}{Target estimand: "ATE" (average treatment effect), "ATT" (average
-treatment effect on the treated), or "overlap" (overlap weighting). Default "ATE".}
+\item{weight_method}{Weighting method: "IPW" (inverse probability weighting),
+"OW" (overlap weighting), or "ATT" (average treatment effect on the treated).
+Default "IPW".}
 
-\item{att_group}{Target group for ATT. Required if \code{estimand = "ATT"}.}
+\item{att_group}{Target group for ATT. Required if \code{weight_method = "ATT"}.}
 
-\item{trim}{Trimming method: "symmetric" or "asymmetric". Default NULL (no trimming).}
+\item{trim}{Logical. Perform symmetric propensity score trimming? Default FALSE.
+If TRUE, symmetric trimming is applied (Crump extension for multiple treatments).
+See \code{\link{estimate_weights}} for trimming details. Ignored if
+\code{weight_method = "OW"}. Asymmetric trimming is no longer supported due to
+poor statistical performance.}
 
-\item{delta}{Threshold for symmetric trimming (e.g., 0.1). Required if \code{trim = "symmetric"}.}
-
-\item{alpha}{Percentile for asymmetric trimming (e.g., 0.05). Required if \code{trim = "asymmetric"}.}
+\item{delta}{Threshold for symmetric trimming in \eqn{(0, 1/J]}, where \eqn{J} is the number
+of treatment levels. Default NULL uses recommended values: 0.1 for binary
+treatment, 0.067 for 3 groups, \eqn{1/(2J)} for \eqn{J \ge 4} (Yoshida et al., 2019).
+Used only if \code{trim = TRUE}.}
 
 \item{contrast_matrix}{Optional matrix for treatment differences in multiple group settings.
 Each row defines one contrast with exactly two non-zero elements: -1 and 1.
@@ -111,9 +116,31 @@ List containing:
 Main user interface for estimating counterfactual survival functions and
 treatment effects using propensity score weighting and inverse probability
 of censoring weighting. Supports binary and multiple treatment groups with
-various weighting schemes (ATE, ATT, overlap) and optional trimming.
+various weighting schemes (IPW, OW, or ATT) and optional trimming.
 }
 \details{
+**Weighting Methods:**
+
+The \code{weight_method} parameter specifies the target population for causal
+inference:
+
+\itemize{
+  \item \strong{IPW (Inverse Probability Weighting)}: Observations are weighted
+    by the inverse probability of their observed treatment, \eqn{w_i = 1/e_j(X_i)}
+    where j is the observed treatment group. Inference targets the combined
+    population.
+
+  \item \strong{OW (Overlap Weighting)}: Observations are weighted by overlap
+    weights, which extends to multiple treatment groups (Li et al., 2018;
+    Li and Li, 2019). Inference targets the population at clinical equipoise
+    (overlap population).
+
+  \item \strong{ATT (Average Treatment Effect on the Treated)}: IPW weights
+    tilted toward a specified target group. Observations in the target group
+    receive weight 1, others receive \eqn{w_i = e_{\text{target}}(X_i) / e_j(X_i)}.
+    Inference targets the specified treatment group population.
+}
+
 **Variance Estimation:**
 - Analytical: Binary treatment with Weibull censoring only (M-estimation).
 - Bootstrap: All settings (resamples entire pipeline).
@@ -131,19 +158,19 @@ result1 <- surveff(
   data = simdata_bin,
   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
   censoring_formula = survival::Surv(time, event) ~ X1 + B1,
-  estimand = "overlap",
+  weight_method = "OW",
   censoring_method = "weibull"
 )
 summary(result1)
 plot(result1)
 
-# Example 2: Multiple treatments with ATE and Cox censoring model
+# Example 2: Multiple treatments with IPW and Cox censoring model
 data(simdata_multi)
 result2 <- surveff(
   data = simdata_multi,
   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
   censoring_formula = survival::Surv(time, event) ~ X1 + B1,
-  estimand = "ATE",
+  weight_method = "IPW",
   censoring_method = "cox",
   variance_method = "bootstrap",
   B = 100
@@ -151,4 +178,20 @@ result2 <- surveff(
 summary(result2)
 }
 
+}
+\references{
+Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via
+propensity score weighting. \emph{Journal of the American Statistical Association},
+113(521), 390-400.
+
+Li, F., & Li, F. (2019). Propensity score weighting for causal inference with
+multiple treatments. \emph{The Annals of Applied Statistics}, 13(4), 2389-2415.
+
+Yoshida, K., et al. (2019). Multinomial extension of propensity score trimming
+methods: A simulation study. \emph{American Journal of Epidemiology}, 188(3),
+609-616.
+
+Cheng, C., Li, F., Thomas, L. E., & Li, F. (2022). Addressing extreme propensity
+scores in estimating counterfactual survival functions via the overlap weights.
+\emph{American Journal of Epidemiology}, 191(6), 1140-1151.
 }

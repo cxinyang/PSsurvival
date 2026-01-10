@@ -42,3 +42,9 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+/doc/
+/Meta/
+
+# CRAN submission files (not needed on GitHub)
+cran-comments.md
+CRAN-SUBMISSION

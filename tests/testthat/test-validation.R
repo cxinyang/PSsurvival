@@ -59,7 +59,7 @@ test_that("surveff errors when event variable is not binary", {
   )
 })
 
-test_that("surveff errors for invalid estimand", {
+test_that("surveff errors for invalid weight_method", {
   data <- make_test_data_binary(n = 50)
 
   expect_error(
@@ -67,9 +67,9 @@ test_that("surveff errors for invalid estimand", {
       data = data,
       ps_formula = Z ~ X1 + X2,
       censoring_formula = survival::Surv(time, event) ~ X1,
-      estimand = "invalid_estimand"
+      weight_method = "invalid_method"
     ),
-    "estimand must be"
+    "'weight_method' must be"
   )
 })
 
@@ -81,7 +81,7 @@ test_that("surveff errors when ATT specified without att_group", {
       data = data,
       ps_formula = Z ~ X1 + X2,
       censoring_formula = survival::Surv(time, event) ~ X1,
-      estimand = "ATT"
+      weight_method = "ATT"
     ),
     "att_group must be specified"
   )
@@ -95,8 +95,8 @@ test_that("surveff errors when using overlap weights with trimming", {
       data = data,
       ps_formula = Z ~ X1 + X2,
       censoring_formula = survival::Surv(time, event) ~ X1,
-      estimand = "overlap",
-      trim = "symmetric",
+      weight_method = "OW",
+      trim = TRUE,
       delta = 0.1
     ),
     "not supported with overlap"

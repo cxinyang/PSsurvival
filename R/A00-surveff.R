@@ -8,7 +8,7 @@ utils::globalVariables(c("Time", "Estimate", "Strata", "CI_lower", "CI_upper"))
 #' Main user interface for estimating counterfactual survival functions and
 #' treatment effects using propensity score weighting and inverse probability
 #' of censoring weighting. Supports binary and multiple treatment groups with
-#' various weighting schemes (ATE, ATT, overlap) and optional trimming.
+#' various weighting schemes (IPW, OW, or ATT) and optional trimming.
 #'
 #' @param data Data frame containing treatment, outcome, and covariates.
 #' @param ps_formula Formula for propensity score model: \code{treatment ~ covariates}.
@@ -16,12 +16,19 @@ utils::globalVariables(c("Time", "Estimate", "Strata", "CI_lower", "CI_upper"))
 #'   Event should be coded as 1=event, 0=censored. Use \code{I(1-event)} if reversed.
 #' @param eval_times Numeric vector of time points for evaluation. If NULL (default),
 #'   uses all unique event times.
-#' @param estimand Target estimand: "ATE" (average treatment effect), "ATT" (average
-#'   treatment effect on the treated), or "overlap" (overlap weighting). Default "ATE".
-#' @param att_group Target group for ATT. Required if \code{estimand = "ATT"}.
-#' @param trim Trimming method: "symmetric" or "asymmetric". Default NULL (no trimming).
-#' @param delta Threshold for symmetric trimming (e.g., 0.1). Required if \code{trim = "symmetric"}.
-#' @param alpha Percentile for asymmetric trimming (e.g., 0.05). Required if \code{trim = "asymmetric"}.
+#' @param weight_method Weighting method: "IPW" (inverse probability weighting),
+#'   "OW" (overlap weighting), or "ATT" (average treatment effect on the treated).
+#'   Default "IPW".
+#' @param att_group Target group for ATT. Required if \code{weight_method = "ATT"}.
+#' @param trim Logical. Perform symmetric propensity score trimming? Default FALSE.
+#'   If TRUE, symmetric trimming is applied (Crump extension for multiple treatments).
+#'   See \code{\link{estimate_weights}} for trimming details. Ignored if
+#'   \code{weight_method = "OW"}. Asymmetric trimming is no longer supported due to
+#'   poor statistical performance.
+#' @param delta Threshold for symmetric trimming in \eqn{(0, 1/J]}, where \eqn{J} is the number
+#'   of treatment levels. Default NULL uses recommended values: 0.1 for binary
+#'   treatment, 0.067 for 3 groups, \eqn{1/(2J)} for \eqn{J \ge 4} (Yoshida et al., 2019).
+#'   Used only if \code{trim = TRUE}.
 #' @param contrast_matrix Optional matrix for treatment differences in multiple group settings.
 #'   Each row defines one contrast with exactly two non-zero elements: -1 and 1.
 #'   Column names must match treatment levels. For binary treatment, always estimates
@@ -70,6 +77,28 @@ utils::globalVariables(c("Time", "Estimate", "Strata", "CI_lower", "CI_upper"))
 #'   \item{boot_result}{Bootstrap results (NULL if analytical variance used).}
 #'
 #' @details
+#' **Weighting Methods:**
+#'
+#' The \code{weight_method} parameter specifies the target population for causal
+#' inference:
+#'
+#' \itemize{
+#'   \item \strong{IPW (Inverse Probability Weighting)}: Observations are weighted
+#'     by the inverse probability of their observed treatment, \eqn{w_i = 1/e_j(X_i)}
+#'     where j is the observed treatment group. Inference targets the combined
+#'     population.
+#'
+#'   \item \strong{OW (Overlap Weighting)}: Observations are weighted by overlap
+#'     weights, which extends to multiple treatment groups (Li et al., 2018;
+#'     Li and Li, 2019). Inference targets the population at clinical equipoise
+#'     (overlap population).
+#'
+#'   \item \strong{ATT (Average Treatment Effect on the Treated)}: IPW weights
+#'     tilted toward a specified target group. Observations in the target group
+#'     receive weight 1, others receive \eqn{w_i = e_{\text{target}}(X_i) / e_j(X_i)}.
+#'     Inference targets the specified treatment group population.
+#' }
+#'
 #' **Variance Estimation:**
 #' - Analytical: Binary treatment with Weibull censoring only (M-estimation).
 #' - Bootstrap: All settings (resamples entire pipeline).
@@ -87,19 +116,19 @@ utils::globalVariables(c("Time", "Estimate", "Strata", "CI_lower", "CI_upper"))
 #'   data = simdata_bin,
 #'   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
 #'   censoring_formula = survival::Surv(time, event) ~ X1 + B1,
-#'   estimand = "overlap",
+#'   weight_method = "OW",
 #'   censoring_method = "weibull"
 #' )
 #' summary(result1)
 #' plot(result1)
 #'
-#' # Example 2: Multiple treatments with ATE and Cox censoring model
+#' # Example 2: Multiple treatments with IPW and Cox censoring model
 #' data(simdata_multi)
 #' result2 <- surveff(
 #'   data = simdata_multi,
 #'   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
 #'   censoring_formula = survival::Surv(time, event) ~ X1 + B1,
-#'   estimand = "ATE",
+#'   weight_method = "IPW",
 #'   censoring_method = "cox",
 #'   variance_method = "bootstrap",
 #'   B = 100
@@ -107,16 +136,31 @@ utils::globalVariables(c("Time", "Estimate", "Strata", "CI_lower", "CI_upper"))
 #' summary(result2)
 #' }
 #'
+#' @references
+#' Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via
+#' propensity score weighting. \emph{Journal of the American Statistical Association},
+#' 113(521), 390-400.
+#'
+#' Li, F., & Li, F. (2019). Propensity score weighting for causal inference with
+#' multiple treatments. \emph{The Annals of Applied Statistics}, 13(4), 2389-2415.
+#'
+#' Yoshida, K., et al. (2019). Multinomial extension of propensity score trimming
+#' methods: A simulation study. \emph{American Journal of Epidemiology}, 188(3),
+#' 609-616.
+#'
+#' Cheng, C., Li, F., Thomas, L. E., & Li, F. (2022). Addressing extreme propensity
+#' scores in estimating counterfactual survival functions via the overlap weights.
+#' \emph{American Journal of Epidemiology}, 191(6), 1140-1151.
+#'
 #' @export
 surveff <- function(data,
                     ps_formula,
                     censoring_formula,
                     eval_times = NULL,
-                    estimand = "ATE",
+                    weight_method = "IPW",
                     att_group = NULL,
-                    trim = NULL,
+                    trim = FALSE,
                     delta = NULL,
-                    alpha = NULL,
                     contrast_matrix = NULL,
                     censoring_method = "weibull",
                     variance_method = NULL,
@@ -129,27 +173,48 @@ surveff <- function(data,
                     ps_control = list(),
                     boot_level = "full") {
 
-  # Step 1: Map surveff parameters to validation function parameters
-  # Check for invalid combinations
-  if (estimand == "overlap" && !is.null(trim)) {
+  # ============================================================================
+  # STEP 1: Map user-facing parameters to internal implementation
+  # ============================================================================
+  # NOTE: This mapping layer is a temporary strategy to align the user-facing API
+  # (weight_method, trim as logical) with the internal implementation (estimand,
+  # trim as character) and to disable asymmetric trimming without extensive
+  # refactoring of downstream functions.
+
+  # Validate weight_method
+  if (!weight_method %in% c("IPW", "OW", "ATT")) {
+    stop("'weight_method' must be 'IPW', 'OW', or 'ATT'.", call. = FALSE)
+  }
+
+  # Validate OW + trim combination (before transforming trim)
+  if (weight_method == "OW" && trim) {
     stop("Trimming is not supported with overlap weights.\n",
-         "  Overlap weights have downweighted tail populations and been bounded [0,1].\n",
-         "  Use estimand = 'ATE' or 'ATT' with trim if needed.",
+         "  Overlap weights already downweight tail populations and are bounded [0,1].\n",
+         "  Use weight_method = 'IPW' or 'ATT' with trim if needed.",
          call. = FALSE)
   }
 
-  # Map estimand + trim to weight_method
+  # Map weight_method to internal estimand
+  estimand <- switch(weight_method,
+                     "IPW" = "ATE",
+                     "OW" = "overlap",
+                     "ATT" = "ATT")
+
+  # Transform trim from logical to character/NULL for internal use
+  trim <- if (trim) "symmetric" else NULL
+
+  # Set delta and alpha for internal use
+  delta <- if (!is.null(trim)) delta else NULL
+  alpha <- NULL  # Asymmetric trimming no longer supported
+
+  # Map to validation function's expected weight_method format
+  # (validation function expects: "OW", "IPTW", "Symmetric", "Asymmetric")
   if (estimand == "overlap") {
-    weight_method <- "OW"
+    validation_weight_method <- "OW"
   } else if (is.null(trim)) {
-    weight_method <- "IPTW"
+    validation_weight_method <- "IPTW"
   } else if (trim == "symmetric") {
-    weight_method <- "Symmetric"
-  } else if (trim == "asymmetric") {
-    weight_method <- "Asymmetric"
-  } else {
-    stop("Invalid trim value: '", trim, "'. Must be 'symmetric', 'asymmetric', or NULL.",
-         call. = FALSE)
+    validation_weight_method <- "Symmetric"
   }
 
   # Set default censoring_control based on method
@@ -170,7 +235,7 @@ surveff <- function(data,
     data = data,
     ps_formula = ps_formula,
     censor_formula = censoring_formula,
-    weight_method = weight_method,
+    weight_method = validation_weight_method,
     censor_method = censoring_method,
     trim_alpha = delta,
     trim_q = alpha,

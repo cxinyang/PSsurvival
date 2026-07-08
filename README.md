@@ -84,6 +84,8 @@ summary(km_result)
 
 **Variance estimation**: For binary treatments with Weibull censoring, analytical variance based on M-estimation theory is available. Bootstrap variance (resampling the full estimation pipeline) is supported for all configurations.
 
+**Multiple imputation**: `surveff()` and `marCoxph()` provide `tidy()` and `df.residual()` methods, so fits can be pooled across multiply imputed datasets with the standard `mice::pool()` workflow.
+
 ## References
 Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via propensity score weighting. *Journal of the American Statistical Association*, 113(521), 390-400.
 

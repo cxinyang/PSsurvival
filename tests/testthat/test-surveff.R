@@ -167,3 +167,58 @@ test_that("surveff summary and plot methods work", {
   expect_s3_class(plot(result, type = "surv"), "ggplot")
   expect_s3_class(plot(result, type = "survdiff"), "ggplot")
 })
+
+test_that("tidy.surveff and df.residual.surveff return broom-style output", {
+  data <- make_test_data_binary(n = 150)
+
+  result <- surveff(
+    data = data,
+    ps_formula = Z ~ X1 + X2 + B1,
+    censoring_formula = survival::Surv(time, event) ~ X1,
+    eval_times = c(0.5, 1, 1.5),
+    weight_method = "OW",
+    censoring_method = "weibull"
+  )
+
+  td <- tidy.surveff(result)
+  expect_s3_class(td, "data.frame")
+  expect_true(all(c("term", "parameter", "estimate", "std.error",
+                    "statistic", "p.value") %in% names(td)))
+
+  # 2 groups + 1 contrast, each at 3 eval_times = 9 rows
+  n_groups <- ncol(result$survival_estimates)
+  n_contr <- ncol(result$difference_estimates)
+  n_times <- length(result$eval_times)
+  expect_equal(nrow(td), (n_groups + n_contr) * n_times)
+
+  # Terms are unique (required for pool() to group correctly across imputations)
+  expect_equal(length(unique(td$term)), nrow(td))
+
+  # Survival-row estimates match the source matrix (natural probability scale)
+  surv_rows <- td[td$parameter == "survival", ]
+  expect_equal(surv_rows$estimate,
+               as.numeric(result$survival_estimates))
+  expect_equal(surv_rows$std.error,
+               as.numeric(result$survival_se))
+
+  # Difference-row estimates match the source matrix
+  diff_rows <- td[td$parameter == "difference", ]
+  expect_equal(diff_rows$estimate, as.numeric(result$difference_estimates))
+
+  # conf.int columns
+  td_ci <- tidy.surveff(result, conf.int = TRUE)
+  expect_true(all(c("conf.low", "conf.high") %in% names(td_ci)))
+
+  # tidy() must absorb the extra args mice injects (effects, parametric, dfcom)
+  expect_equal(
+    tidy.surveff(result, effects = "fixed", parametric = TRUE, dfcom = Inf),
+    td
+  )
+
+  # df.residual is Inf (large-sample pooling for curve estimators)
+  expect_identical(df.residual.surveff(result), Inf)
+
+  # Dispatch via the generics/stats generics (as used by mice::pool())
+  expect_equal(generics::tidy(result), td)
+  expect_identical(stats::df.residual(result), Inf)
+})

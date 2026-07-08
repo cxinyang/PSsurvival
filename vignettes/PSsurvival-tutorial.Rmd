@@ -584,6 +584,47 @@ summary(km_ow, type = "Kaplan-Meier", conf_type = "log-log", print.rows = 5)
 
 The summary returns a list of matrices (one per treatment group) with full-precision estimates, invisibly. Customize display with `print.digits` and `print.rows`.
 
+## 6. Multiple imputation with `mice`
+
+Missing covariate data can be handled by multiple imputation. `surveff()` and
+`marCoxph()` provide `tidy()` and `df.residual()` methods, so they slot into the
+standard `mice` workflow --- impute, fit each dataset with `with()`, combine with
+`pool()` --- exactly like an ordinary model such as `coxph()`.
+
+```{r mice-impute, eval = requireNamespace("mice", quietly = TRUE), message = FALSE, warning = FALSE}
+library(mice)
+
+d <- simdata_bin
+set.seed(1)
+d$X1[sample(nrow(d), 100)] <- NA          # some missing covariate values
+imp <- mice(d, m = 5, printFlag = FALSE)  # impute
+```
+
+Marginal hazard ratio:
+
+```{r mice-marcoxph, eval = requireNamespace("mice", quietly = TRUE), warning = FALSE}
+fit <- with(imp, marCoxph(
+  data = data.frame(Z, X1, X2, X3, B1, B2, time, event),
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  time_var = "time", event_var = "event",
+  reference_level = "A", weight_method = "OW", variance_method = "robust"))
+summary(pool(fit))
+```
+
+Counterfactual survival is identical; pass a fixed `eval_times` so the pooled
+parameters line up across imputations:
+
+```{r mice-surveff, eval = requireNamespace("mice", quietly = TRUE), warning = FALSE}
+fit <- with(imp, surveff(
+  data = data.frame(Z, X1, X2, X3, B1, B2, time, event),
+  ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+  censoring_formula = survival::Surv(time, event) ~ X1 + B1,
+  eval_times = c(0.5, 1, 1.5), weight_method = "OW", censoring_method = "weibull"))
+summary(pool(fit))
+```
+
+The same pattern applies to multi-group data (`simdata_multi`).
+
 ## Summary
 
 | Feature | `surveff()` | `marCoxph()` | `weightedKM()` |

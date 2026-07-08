@@ -615,3 +615,105 @@ summary.marCoxph <- function(object, conf_level = 0.95, round.digits = 4,
 
   invisible(object)
 }
+
+
+#' Tidy Method for marCoxph Objects
+#'
+#' @description
+#' Extracts log hazard ratio estimates into a tidy data frame with
+#' \code{term}, \code{estimate}, and \code{std.error} columns, following
+#' \pkg{broom} conventions. This lets \code{marCoxph} objects be pooled
+#' across multiply imputed datasets with \code{mice::pool()}: fit the model
+#' on each imputation with \code{with(imp, marCoxph(...))}, then call
+#' \code{pool()} on the resulting \code{mira} object.
+#'
+#' @param x A \code{marCoxph} object.
+#' @param conf.int Logical. Include confidence interval columns? Default FALSE.
+#' @param conf.level Confidence level for the interval. Default 0.95.
+#' @param exponentiate Logical. Report hazard ratios (\code{exp(estimate)})
+#'   instead of log hazard ratios? Default FALSE.
+#' @param ... Additional arguments (ignored).
+#'
+#' @return A data frame with one row per treatment comparison and columns
+#'   \code{term}, \code{estimate}, \code{std.error}, \code{statistic},
+#'   \code{p.value}, and (if \code{conf.int = TRUE}) \code{conf.low},
+#'   \code{conf.high}. The standard error is \code{logHR_se_bootstrap} if the
+#'   model was fit with \code{variance_method = "bootstrap"}, otherwise
+#'   \code{logHR_se_robust}.
+#'
+#' @examples
+#' \donttest{
+#' data(simdata_bin)
+#' fit <- marCoxph(
+#'   data = simdata_bin,
+#'   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+#'   time_var = "time",
+#'   event_var = "event",
+#'   reference_level = "A",
+#'   weight_method = "OW",
+#'   variance_method = "robust"
+#' )
+#' generics::tidy(fit)
+#' }
+#'
+#' @importFrom generics tidy
+#' @export
+tidy.marCoxph <- function(x, conf.int = FALSE, conf.level = 0.95,
+                          exponentiate = FALSE, ...) {
+  se_use <- if (grepl("^bootstrap", x$variance_method)) {
+    x$logHR_se_bootstrap
+  } else {
+    x$logHR_se_robust
+  }
+
+  estimate <- x$logHR_est
+  statistic <- estimate / se_use
+  p_value <- 2 * stats::pnorm(-abs(statistic))
+
+  out <- data.frame(
+    term = names(estimate),
+    estimate = as.numeric(estimate),
+    std.error = as.numeric(se_use),
+    statistic = as.numeric(statistic),
+    p.value = as.numeric(p_value),
+    row.names = NULL,
+    stringsAsFactors = FALSE
+  )
+
+  if (conf.int) {
+    z_crit <- stats::qnorm(1 - (1 - conf.level) / 2)
+    out$conf.low <- out$estimate - z_crit * out$std.error
+    out$conf.high <- out$estimate + z_crit * out$std.error
+  }
+
+  if (exponentiate) {
+    exp_cols <- intersect(c("estimate", "conf.low", "conf.high"), colnames(out))
+    out[exp_cols] <- lapply(out[exp_cols], exp)
+  }
+
+  out
+}
+
+
+#' Residual Degrees of Freedom for marCoxph Objects
+#'
+#' @description
+#' Returns the complete-data residual degrees of freedom for a \code{marCoxph}
+#' fit. This method exists so that \code{mice::pool()} can apply the
+#' Barnard-Rubin small-sample degrees-of-freedom correction when pooling
+#' \code{marCoxph} fits across multiply imputed datasets. Used together with
+#' \code{\link{tidy.marCoxph}}.
+#'
+#' @param object A \code{marCoxph} object.
+#' @param ... Additional arguments (ignored).
+#'
+#' @return A single numeric value: the total number of events used in the Cox
+#'   model minus the number of estimated log hazard ratios
+#'   (\code{sum(events) - number of coefficients}). This mirrors the convention
+#'   used by \code{survival::coxph} objects (\code{nevent - length(coef)}).
+#'
+#' @importFrom stats df.residual
+#' @export
+df.residual.marCoxph <- function(object, ...) {
+  sum(object$events_coxph_fitted) - length(object$logHR_est)
+}

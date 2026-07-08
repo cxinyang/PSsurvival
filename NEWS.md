@@ -1,3 +1,12 @@
+# PSsurvival 0.2.1
+
+## New features
+
+* `marCoxph()` and `surveff()` fits can now be pooled across multiply imputed
+  datasets with the standard `mice` workflow, `pool(with(imp, ...))`. This is
+  enabled by new `tidy()` and `df.residual()` S3 methods for both classes. See
+  the "Multiple imputation with mice" section of the main vignette.
+
 # PSsurvival 0.2.0
 
 ## Breaking Changes

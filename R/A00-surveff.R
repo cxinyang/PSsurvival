@@ -726,3 +726,117 @@ plot.surveff <- function(x, type = "surv", max_time = NULL, strata_to_plot = NUL
 
   return(p)
 }
+
+
+#' Tidy Method for surveff Objects
+#'
+#' @description
+#' Extracts the estimated survival curve (and treatment-effect difference curve,
+#' if present) into a tidy data frame with one row per (group, time) and per
+#' (contrast, time), following \pkg{broom} conventions. This lets \code{surveff}
+#' objects be pooled across multiply imputed datasets with \code{mice::pool()}:
+#' fit the model on each imputation with \code{with(imp, surveff(...))}, then
+#' call \code{pool()} on the resulting \code{mira} object.
+#'
+#' Each estimate at each evaluation time is treated as a separate parameter, so
+#' the \code{eval_times} (and any \code{contrast_matrix}) must be identical
+#' across all imputations for the terms to line up during pooling.
+#'
+#' @param x A \code{surveff} object.
+#' @param conf.int Logical. Include confidence interval columns? Default FALSE.
+#' @param conf.level Confidence level for the interval. Default 0.95.
+#' @param ... Additional arguments (ignored). Absorbs the extra arguments
+#'   \code{mice} passes to \code{tidy} (e.g. \code{effects}, \code{parametric},
+#'   \code{dfcom}).
+#'
+#' @return A data frame with columns \code{term} (self-contained identifier
+#'   encoding parameter type, group/contrast, and evaluation time, e.g.
+#'   \code{"survival:A@t=1.5"}), \code{parameter} (\code{"survival"} or
+#'   \code{"difference"}), \code{estimate}, \code{std.error}, \code{statistic},
+#'   \code{p.value}, and (if \code{conf.int = TRUE}) \code{conf.low},
+#'   \code{conf.high}. Survival estimates are on the natural probability scale.
+#'
+#' @examples
+#' \donttest{
+#' data(simdata_bin)
+#' fit <- surveff(
+#'   data = simdata_bin,
+#'   ps_formula = Z ~ X1 + X2 + X3 + B1 + B2,
+#'   censoring_formula = survival::Surv(time, event) ~ X1 + B1,
+#'   eval_times = c(0.5, 1, 1.5),
+#'   weight_method = "OW",
+#'   censoring_method = "weibull"
+#' )
+#' generics::tidy(fit)
+#' }
+#'
+#' @importFrom generics tidy
+#' @export
+tidy.surveff <- function(x, conf.int = FALSE, conf.level = 0.95, ...) {
+  times <- x$eval_times
+
+  # One block of rows per treatment group (survival curves)
+  surv_groups <- colnames(x$survival_estimates)
+  blocks <- lapply(surv_groups, function(g) {
+    data.frame(
+      term = paste0("survival:", g, "@t=", times),
+      parameter = "survival",
+      estimate = as.numeric(x$survival_estimates[, g]),
+      std.error = as.numeric(x$survival_se[, g]),
+      stringsAsFactors = FALSE
+    )
+  })
+
+  # One block of rows per contrast (difference curves), if estimated
+  if (!is.null(x$difference_estimates)) {
+    diff_contrasts <- colnames(x$difference_estimates)
+    diff_blocks <- lapply(diff_contrasts, function(cc) {
+      data.frame(
+        term = paste0("difference:", cc, "@t=", times),
+        parameter = "difference",
+        estimate = as.numeric(x$difference_estimates[, cc]),
+        std.error = as.numeric(x$difference_se[, cc]),
+        stringsAsFactors = FALSE
+      )
+    })
+    blocks <- c(blocks, diff_blocks)
+  }
+
+  out <- do.call(rbind, blocks)
+  rownames(out) <- NULL
+
+  out$statistic <- out$estimate / out$std.error
+  out$p.value <- 2 * stats::pnorm(-abs(out$statistic))
+
+  if (conf.int) {
+    z_crit <- stats::qnorm(1 - (1 - conf.level) / 2)
+    out$conf.low <- out$estimate - z_crit * out$std.error
+    out$conf.high <- out$estimate + z_crit * out$std.error
+  }
+
+  out
+}
+
+
+#' Residual Degrees of Freedom for surveff Objects
+#'
+#' @description
+#' Returns the complete-data residual degrees of freedom for a \code{surveff}
+#' fit, for use by \code{mice::pool()} when pooling across multiply imputed
+#' datasets. This method returns \code{Inf}: a survival curve has no single
+#' finite complete-data degrees-of-freedom (each evaluation time uses a
+#' different amount of data and there is no common number of parameters), so
+#' \code{pool()} applies the large-sample (Rubin 1987) pooling rule rather than
+#' the Barnard-Rubin small-sample correction. This is the standard treatment
+#' for asymptotically-justified survival-curve estimators.
+#'
+#' @param object A \code{surveff} object.
+#' @param ... Additional arguments (ignored).
+#'
+#' @return \code{Inf}.
+#'
+#' @importFrom stats df.residual
+#' @export
+df.residual.surveff <- function(object, ...) {
+  Inf
+}

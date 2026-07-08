@@ -189,3 +189,46 @@ test_that("marCoxph summary method works", {
   # Check exponentiated HR
   expect_equal(summ$HR, exp(summ$logHR), tolerance = 1e-6)
 })
+
+test_that("tidy.marCoxph and df.residual.marCoxph return broom-style output", {
+  data <- make_test_data_binary(n = 150)
+
+  result <- marCoxph(
+    data = data,
+    ps_formula = Z ~ X1 + X2 + B1,
+    time_var = "time",
+    event_var = "event",
+    reference_level = "A",
+    weight_method = "OW",
+    variance_method = "robust"
+  )
+
+  td <- tidy.marCoxph(result)
+  expect_s3_class(td, "data.frame")
+  expect_true(all(c("term", "estimate", "std.error", "statistic", "p.value") %in% names(td)))
+  expect_equal(td$term, names(result$logHR_est))
+  expect_equal(td$estimate, as.numeric(result$logHR_est))
+  expect_equal(td$std.error, as.numeric(result$logHR_se_robust))
+
+  td_ci <- tidy.marCoxph(result, conf.int = TRUE)
+  expect_true(all(c("conf.low", "conf.high") %in% names(td_ci)))
+  expect_true(td_ci$conf.low < td_ci$estimate && td_ci$estimate < td_ci$conf.high)
+
+  td_exp <- tidy.marCoxph(result, exponentiate = TRUE)
+  expect_equal(td_exp$estimate, exp(td$estimate), tolerance = 1e-8)
+
+  # tidy() must absorb the extra args mice injects (effects, parametric, dfcom)
+  expect_equal(
+    tidy.marCoxph(result, effects = "fixed", parametric = TRUE, dfcom = 100),
+    td
+  )
+
+  # df.residual: total events minus number of log-HR coefficients (coxph convention)
+  dfr <- df.residual.marCoxph(result)
+  expect_equal(dfr, sum(result$events_coxph_fitted) - length(result$logHR_est))
+  expect_true(is.finite(dfr) && dfr > 0)
+
+  # Dispatch via the generics/stats generics (as used by mice::pool())
+  expect_equal(generics::tidy(result), td)
+  expect_equal(stats::df.residual(result), dfr)
+})

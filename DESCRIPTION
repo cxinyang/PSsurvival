@@ -1,7 +1,7 @@
 Package: PSsurvival
 Title: Propensity Score Methods for Survival Analysis
-Version: 0.2.0
-Date: 2026-01-09
+Version: 0.2.1
+Date: 2026-07-08
 Authors@R: c(
     person("Chengxin", "Yang",
            email = "chengxin.yang@duke.edu",
@@ -36,13 +36,15 @@ Imports:
     stats,
     utils,
     ggplot2,
-    cowplot
+    cowplot,
+    generics
 Suggests:
     nnet,
     parallel,
     testthat (>= 3.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    mice
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.3
